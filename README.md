@@ -202,3 +202,10 @@ builtins seguem alcançáveis em CPython por código determinado. Rode sobre `be
 (dados públicos) e nada mais. A chave de API vive em `.env`, que está no `.gitignore`;
 o repositório original tem a mesma chave literal em 10 pontos de 3 arquivos e aponta
 para um relay de terceiro — não reuse nada de lá.
+
+## Licença
+
+[MIT](LICENSE). O código desta POC é original; o ZeroDC entra como referência de
+comparação e como fonte externa somente-leitura (datasets e o MiniLM local), lidos de
+`ZERODC_DIR` e **não** redistribuídos aqui — as condições de uso deles são as do
+repositório de origem.
