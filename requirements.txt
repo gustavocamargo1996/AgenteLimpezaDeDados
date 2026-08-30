@@ -1,0 +1,9 @@
+numpy>=1.26
+pandas>=2.2
+scikit-learn>=1.5
+onnxruntime>=1.18
+tokenizers>=0.20
+langchain-core>=0.3
+langchain-openai>=0.2
+pydantic>=2.7
+python-dotenv>=1.0

@@ -1,0 +1,13 @@
+.env
+runs/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# backups de rollback local (nao versionar)
+*.bak
+*.bak-*
+
+# notas internas de sessao (nao publicar)
+.claude/
