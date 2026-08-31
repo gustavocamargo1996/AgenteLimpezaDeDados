@@ -2,10 +2,11 @@
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
 
-from .. import config, sandbox
+from .. import amostragem, config, sandbox
 from ..esquemas import RegraDeteccao
+from ..tipos import Detector
 from .oraculo import _amostrar_oraculo, _classificar
-from .regra import _AMOSTRAS_FUMACA, DETECTA_NADA
+from .regra import _AMOSTRAS_FUMACA, DETECTA_NADA, detector_de, materializar
 
 SISTEMA_UPDATE = """Voce REVISA uma regra de deteccao de erro para uma coluna \
 de tabela suja, a partir de FEEDBACK de um oraculo (rotulos verdadeiros de \
@@ -147,71 +148,39 @@ def _precisao_no_oraculo(funcao, rotulos: list[dict]) -> float | None:
 
 
 def _tentar_update(cadeia_update, coluna: str, codigo_atual: str, feedback: str):
-    """Invoca o LLM de update e VALIDA a regra revisada no mesmo portao do 1-passe.
-
-    Devolve (funcao_viva, RegraDeteccao, "") em sucesso; (None, None, motivo) se
-    o invoke falhar, o `codigo` vier vazio, ou nao passar em
-    sandbox.materializar + testar_fumaca. O chamador entao MANTEM a regra
-    anterior (conservador -- risco de regra que quebra em runtime).
-    """
+    """Invoca o LLM de update e devolve (Detector novo, "") ou (None, motivo)."""
+    # O portao e' o mesmo do 1-passe: revisao que nao materializa nem passa na
+    # fumaca e' descartada, e o chamador mantem a regra anterior.
     try:
         nova: RegraDeteccao = cadeia_update.invoke(
             {"coluna": coluna, "codigo_atual": codigo_atual, "feedback": feedback}
         )
     except Exception as exc:  # noqa: BLE001 -- update nao pode derrubar o loop
-        return None, None, f"invoke falhou ({type(exc).__name__}: {exc})"
+        return None, f"invoke falhou ({type(exc).__name__}: {exc})"
 
     codigo = (nova.codigo or "").strip()
     if not codigo:
-        return None, None, "codigo vazio"
+        return None, "codigo vazio"
     try:
-        funcao = sandbox.materializar(
-            codigo, nome_funcao="detectar", nome_argumento="col",
-            series_mode=True,
-        )
-        sandbox.testar_fumaca(
-            funcao, pd.Series(_AMOSTRAS_FUMACA), series_mode=True
-        )
+        funcao = materializar(codigo)
+        sandbox.testar_fumaca(funcao, pd.Series(_AMOSTRAS_FUMACA), series_mode=True)
     except sandbox.CodigoRejeitado as exc:
-        return None, None, str(exc)
+        return None, str(exc)
     nova.codigo = codigo
-    return funcao, nova, ""
+    return detector_de(nova, funcao), ""
 
 
-def refinar_regra_deteccao(
-    coluna: str,
-    funcao,
-    regra: RegraDeteccao,
-    sujo_col: pd.Series,
-    limpo_col: pd.Series,
-    valores_distintos: list[str],
-    embedder,
-    iteracoes: int,
-    amostras_por_iter: int,
-    agente_update,
-) -> dict:
-    """Loop de active learning que refina `detectar(col)` com um oraculo.
-
-    Contrato (plano secao 6). Por iteracao:
-      1. amostra valores distintos NOVOS (metade previsto-sujo, metade
-         previsto-limpo) por farthest-point (`_amostrar_oraculo`);
-      2. oraculo: para cada valor amostrado olha as celulas que o contem e decide
-         `eh_erro_real = existe >=1 celula com dirty!=clean`; guarda os indices
-         dessas celulas em `orcamento` -- SO' para relatorio de custo, NAO para o
-         holdout da metrica (plano secao 6.7);
-      3. monta o feedback CUMULATIVO (todos os rotulos ate agora);
-      4. pede ao LLM (structured output RegraDeteccao) uma regra revisada; ela so'
-         substitui a anterior se passar por sandbox.materializar + testar_fumaca,
-         senao MANTEM a regra da iteracao anterior.
-
-    A metrica NAO muda: as celulas-oraculo continuam no holdout de correcao, nao
-    no da deteccao (invariante 2). Devolve {funcao, regra, historico, orcamento};
-    `funcao`/`regra` sao a versao final (refinada ou a ultima valida).
-    """
+def refinar_regra_deteccao(detector: Detector, coluna, agente, emb=None) -> Detector:
+    """Refina `detectar(col)` por active learning com um oraculo, e devolve o Detector."""
+    # Por iteracao: amostra valores distintos novos, rotula pelo clique do
+    # oraculo, monta o feedback CUMULATIVO e pede uma revisao ao agente.
     prompt = ChatPromptTemplate.from_messages(
         [("system", SISTEMA_UPDATE), ("human", HUMANO_UPDATE)]
     )
-    cadeia_update = prompt | agente_update
+    cadeia_update = prompt | agente
+    emb = emb or amostragem.embedder()
+    iteracoes = config.ITERACOES_DETECCAO
+    amostras_por_iter = config.AMOSTRAS_POR_ITERACAO
 
     usados: set[str] = set()
     rotulos: list[dict] = []
@@ -220,27 +189,28 @@ def refinar_regra_deteccao(
 
     for i in range(iteracoes):
         amostrados = _amostrar_oraculo(
-            funcao, valores_distintos, embedder, usados, amostras_por_iter, sujo_col
+            detector.funcao, coluna.valores_distintos, emb, usados,
+            amostras_por_iter, coluna.sujo
         )
         if not amostrados:
             historico.append({
                 "iteracao": i + 1,
                 "amostrados": [],
                 "rotulos_novos": [],
-                "feedback": _montar_feedback_det(funcao, rotulos),
-                "codigo_antes": regra.codigo or "",
-                "codigo_depois": regra.codigo or "",
+                "feedback": _montar_feedback_det(detector.funcao, rotulos),
+                "codigo_antes": detector.codigo,
+                "codigo_depois": detector.codigo,
                 "mudou": False,
                 "status": "sem_amostra: nenhum valor distinto novo para rotular",
             })
             continue
 
-        marcas_amostrados = _classificar(funcao, list(amostrados))
+        marcas_amostrados = _classificar(detector.funcao, list(amostrados))
         rotulos_novos = []
         for v, marcado in zip(amostrados, marcas_amostrados):
             usados.add(v)
-            indices = sujo_col.index[sujo_col == v]
-            eh_erro_real = bool((limpo_col.loc[indices] != v).any())
+            indices = coluna.sujo.index[coluna.sujo == v]
+            eh_erro_real = bool((coluna.limpo.loc[indices] != v).any())
             orcamento["valores_rotulados"].append(v)
             orcamento["indices_celulas"].extend(int(x) for x in indices)
             classificacao_atual = "sujo" if marcado else "limpo"
@@ -248,21 +218,16 @@ def refinar_regra_deteccao(
             rotulos.append(rot)
             rotulos_novos.append({**rot, "classificacao_atual": classificacao_atual})
 
-        feedback = _montar_feedback_det(funcao, rotulos)
-        codigo_antes = regra.codigo or ""
+        feedback = _montar_feedback_det(detector.funcao, rotulos)
+        codigo_antes = detector.codigo
 
-        funcao_nova, regra_nova, erro = _tentar_update(
-            cadeia_update, coluna, codigo_antes, feedback
+        revisado, erro = _tentar_update(
+            cadeia_update, coluna.nome, codigo_antes, feedback
         )
-        if funcao_nova is not None:
-            # GUARDA (A) por iteracao: a regra revisada ja passou sandbox+fumaca
-            # (roda sem quebrar), mas pode ser AMPLA DEMAIS. Avalia o CALLABLE
-            # `funcao_nova` (NAO `regra_nova`) no oraculo cumulativo desta
-            # iteracao (`rotulos`, ja com o append acima). Precisao < LIMITE ->
-            # REJEITA pelo mesmo caminho do fallback (mantem a resident anterior,
-            # funcao/regra intactos), com status distinguivel de "rejeitada:
-            # {erro}". Precisao None (marca 0) ou == LIMITE -> aceita.
-            precisao = _precisao_no_oraculo(funcao_nova, rotulos)
+        if revisado is not None:
+            # Guarda por iteracao: a revisao roda, mas pode ser AMPLA DEMAIS.
+            # Precisao < LIMITE no oraculo cumulativo -> mantem a anterior.
+            precisao = _precisao_no_oraculo(revisado.funcao, rotulos)
             if precisao is not None and precisao < config.LIMITE_PRECISAO_DETECCAO:
                 status = (
                     f"rejeitada por precisao {precisao:.3f}"
@@ -270,9 +235,10 @@ def refinar_regra_deteccao(
                 )
                 mudou = False
             else:
-                funcao, regra = funcao_nova, regra_nova
+                revisado.orcamento, revisado.historico = orcamento, historico
+                detector = revisado
                 status = "aplicada"
-                mudou = (regra.codigo or "") != codigo_antes
+                mudou = detector.codigo != codigo_antes
         else:
             status = f"rejeitada: {erro}"
             mudou = False
@@ -283,31 +249,21 @@ def refinar_regra_deteccao(
             "rotulos_novos": rotulos_novos,
             "feedback": feedback,
             "codigo_antes": codigo_antes,
-            "codigo_depois": regra.codigo or "",
+            "codigo_depois": detector.codigo,
             "mudou": mudou,
             "status": status,
         })
 
-    # PISO (B) apos o laco -- resolve a Armadilha 2 (resident ampla persiste).
-    # Rejeitar (A) mantem a anterior; se a resident FINAL ja e' ampla (ex.: a
-    # 1-passe it0 saiu ampla e todas as revisoes foram rejeitadas) o loop
-    # entregaria o dano. Avalia o CALLABLE residente `funcao` (NAO `regra`) no
-    # oraculo cumulativo: precisao < LIMITE (com >=1 clean marcado) -> substitui
-    # a resident por DETECTA_NADA (dano 0), espelhando gerar_regra_deteccao
-    # (materializa DETECTA_NADA e faz regra.codigo = DETECTA_NADA). Precisao None
-    # (marca 0) ou == LIMITE -> resident preservada.
-    precisao_final = _precisao_no_oraculo(funcao, rotulos)
+    # Piso final: a guarda por iteracao mantem a regra anterior, entao uma
+    # resident ja ampla sobreviveria ao laco. Abaixo do LIMITE cai para nada.
+    precisao_final = _precisao_no_oraculo(detector.funcao, rotulos)
     if precisao_final is not None and precisao_final < config.LIMITE_PRECISAO_DETECCAO:
-        codigo_antes_piso = regra.codigo or ""
-        feedback_piso = _montar_feedback_det(funcao, rotulos)
-        funcao = sandbox.materializar(
-            DETECTA_NADA, nome_funcao="detectar", nome_argumento="col",
-            series_mode=True,
-        )
-        regra.codigo = DETECTA_NADA
-        # Entry com O MESMO CONJUNTO DE CHAVES das entradas do laco -- o relatorio
-        # (relatorio._bloco_historico_deteccao) acessa passo['iteracao'] direto;
-        # um entry sem essa chave quebraria o relatorio ao vivo.
+        codigo_antes_piso = detector.codigo
+        feedback_piso = _montar_feedback_det(detector.funcao, rotulos)
+        detector.funcao = materializar(DETECTA_NADA)
+        detector.codigo = DETECTA_NADA
+        # Mesmo conjunto de chaves das entradas do laco: o relatorio le
+        # passo['iteracao'] direto e quebraria com um entry incompleto.
         historico.append({
             "iteracao": len(historico) + 1,
             "amostrados": [],
@@ -325,9 +281,5 @@ def refinar_regra_deteccao(
     orcamento["indices_celulas"] = sorted(set(orcamento["indices_celulas"]))
     orcamento["n_valores"] = len(orcamento["valores_rotulados"])
     orcamento["n_celulas"] = len(orcamento["indices_celulas"])
-    return {
-        "funcao": funcao,
-        "regra": regra,
-        "historico": historico,
-        "orcamento": orcamento,
-    }
+    detector.orcamento, detector.historico = orcamento, historico
+    return detector

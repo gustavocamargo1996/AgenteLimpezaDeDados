@@ -19,6 +19,7 @@ from sklearn.cluster import KMeans
 from tokenizers import Tokenizer
 
 from . import config
+from .tipos import Amostra, Coluna
 
 
 class Embedder:
@@ -101,3 +102,42 @@ def selecionar(matriz: np.ndarray, n_clusters=None, maximo=None) -> list[int]:
             vistos.add(i)
             saida.append(i)
     return saida[:maximo]
+
+
+_EMBEDDER: Embedder | None = None
+
+
+def embedder() -> Embedder:
+    """Embedder unico do processo -- o ONNX carrega uma vez por run."""
+    global _EMBEDDER
+    if _EMBEDDER is None:
+        _EMBEDDER = Embedder()
+    return _EMBEDDER
+
+
+def representantes(coluna: Coluna, emb=None) -> Amostra:
+    """Escolhe os representantes da coluna e rotula as linhas que serao exibidas."""
+    emb = emb or embedder()
+    indices = selecionar(emb.codificar(coluna.valores_distintos))
+    valores = [coluna.valores_distintos[i] for i in indices]
+    primeira = {valor: int(idx) for idx, valor in coluna.sujo.drop_duplicates().items()}
+    linhas = {primeira[v] for v in valores if v in primeira}
+    return Amostra(
+        representantes=valores,
+        linhas=linhas,
+        rotulados=_rotular(coluna, linhas),
+        total_linhas=len(coluna.sujo),
+        total_distintos=len(coluna.valores_distintos),
+    )
+
+
+def _rotular(coluna: Coluna, linhas: set) -> list[dict]:
+    """Orcamento de rotulos: o par sujo->limpo das linhas efetivamente exibidas."""
+    # Estas linhas sao tambem o holdout da metrica: medir sobre um valor ja
+    # mostrado ao agente mede memorizacao, nao generalizacao.
+    rotulados = []
+    for idx in sorted(linhas):
+        sujo, limpo = coluna.sujo.at[idx], coluna.limpo.at[idx]
+        rotulados.append({"indice": int(idx), "sujo": sujo, "limpo": limpo,
+                          "eh_erro": sujo != limpo})
+    return rotulados

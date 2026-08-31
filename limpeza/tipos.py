@@ -39,6 +39,10 @@ class Detector:
     cadeia: str
     orcamento: dict = field(default_factory=dict)
     historico: list = field(default_factory=list)
+    # Documentais: o relatorio publica os dois campos que o agente emite junto
+    # do codigo. Nada no pipeline decide com base neles.
+    erro_provavel: bool = False
+    condicao_regex: str | None = None
 
 
 @dataclass

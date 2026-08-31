@@ -38,12 +38,12 @@ def main() -> int:
         return 1
 
     secao("2. Dados")
-    sujo, limpo = dados.carregar()
-    print(f"{OK}{len(sujo)} linhas, {len(sujo.columns)} colunas")
-    for nome in config.COLUNAS_PADRAO:
-        col = dados.montar_coluna(sujo, limpo, nome)
-        taxa = col.celulas_erradas / col.total_celulas
-        print(f"{OK}{nome:8s}: {col.celulas_erradas:5d} erradas ({taxa:5.1%}), "
+    tabela = dados.carregar(colunas=config.COLUNAS_PADRAO)
+    print(f"{OK}{len(tabela.sujo)} linhas, {len(tabela.sujo.columns)} colunas")
+    for col in tabela.colunas:
+        erradas = int((col.sujo != col.limpo).sum())
+        taxa = erradas / len(col.sujo)
+        print(f"{OK}{col.nome:8s}: {erradas:5d} erradas ({taxa:5.1%}), "
               f"{len(col.valores_distintos):4d} valores distintos")
 
     secao("3. Embeddings (MiniLM ONNX local)")
@@ -58,19 +58,17 @@ def main() -> int:
           f"'12.0 oz'~'abacaxi' = {distante:.3f}")
 
     secao("4. KMeans -- o que o agente 1 vai ver")
-    for nome in config.COLUNAS_PADRAO:
-        col = dados.montar_coluna(sujo, limpo, nome)
-        m = embedder.codificar(col.valores_distintos)
-        indices = amostragem.selecionar(m)
-        contagem = col.sujo.value_counts().to_dict()
-        print(f"\n  {nome} ({len(indices)} representantes de {len(col.valores_distintos)}):")
-        for i in indices:
-            v = col.valores_distintos[i]
+    for col in tabela.colunas:
+        amostra = amostragem.representantes(col, emb=embedder)
+        contagem = col.contagem
+        print(f"\n  {col.nome} ({len(amostra.representantes)} representantes "
+              f"de {len(col.valores_distintos)}):")
+        for v in amostra.representantes:
             distintos = col.limpo[col.sujo == v].unique().tolist()
             if len(distintos) > 1:
-                amostra = ", ".join(f'"{d}"' for d in distintos[:3])
+                exemplos = ", ".join(f'"{d}"' for d in distintos[:3])
                 print(f'    ?? "{v}"  ({contagem.get(v, 0)}x)  AMBIGUO: '
-                      f'{len(distintos)} valores corretos distintos ({amostra}...)')
+                      f'{len(distintos)} valores corretos distintos ({exemplos}...)')
             elif distintos and distintos[0] != v:
                 print(f'    -> "{v}"  ({contagem.get(v, 0)}x)  correto: "{distintos[0]}"')
             else:

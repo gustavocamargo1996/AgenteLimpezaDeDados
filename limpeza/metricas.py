@@ -108,3 +108,21 @@ def metricas_correcao(
         "taxa_acerto": round(acertos / erradas, 4) if erradas else None,
         "taxa_dano": round(dano / corretas, 4) if corretas else None,
     }
+
+
+def avaliar(trabalhos: list, tabela, mascara, corrigido) -> dict:
+    """Mede deteccao e correcao de cada coluna fora do holdout e preenche `.medida`."""
+    saida: dict = {"deteccao": {}, "correcao": {}}
+    for trabalho in trabalhos:
+        coluna = trabalho.coluna
+        holdout = sorted(trabalho.amostra.linhas) if trabalho.amostra else None
+        deteccao = metricas_deteccao(
+            mascara[coluna.nome], coluna.sujo, coluna.limpo, holdout
+        )
+        correcao = metricas_correcao(
+            corrigido[coluna.nome], coluna.sujo, coluna.limpo, holdout
+        )
+        trabalho.medida = {"deteccao": deteccao, "correcao": correcao}
+        saida["deteccao"][coluna.nome] = deteccao
+        saida["correcao"][coluna.nome] = correcao
+    return saida

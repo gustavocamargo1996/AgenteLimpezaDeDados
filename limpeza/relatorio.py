@@ -15,14 +15,10 @@ def _fmt_pct(v) -> str:
     return "n/d" if v is None else f"{v:.1%}"
 
 
-def _bloco_historico_deteccao(historico: list, orcamento) -> str:
-    """Historico do loop de refinamento de UMA coluna. SO' e' chamado quando N>1.
-
-    Mostra, por iteracao: o que o oraculo rotulou, se a regra mudou (com o
-    status) e o codigo resultante. Fecha com o orcamento (custo) do oraculo.
-    Com N=1 esta funcao NAO e' chamada, entao a cadeias_deteccao.md fica
-    byte-identica ao 1-passe (invariante 7 / plano secao 5).
-    """
+def _bloco_refinamento(historico: list, orcamento) -> str:
+    """Historico do loop de refinamento de UMA coluna, so' emitido quando N>1."""
+    # Por iteracao: o que o oraculo rotulou, se a regra mudou e o codigo
+    # resultante. Fecha com o orcamento (custo) do oraculo.
     linhas = []
     if orcamento:
         linhas.append(
@@ -48,49 +44,48 @@ def _bloco_historico_deteccao(historico: list, orcamento) -> str:
     return "\n".join(linhas)
 
 
-def escrever_e2e(pasta: Path, run: dict) -> None:
-    """Artefatos da geracao do limpador.
+def escrever(saida: Path, trabalhos: list, mascara, corrigido, medida: dict) -> None:
+    """Escreve os artefatos do run: as duas tabelas, os dois .json e os dois .md."""
+    mascara.to_csv(saida / "mascara.csv", index=False)
+    corrigido.to_csv(saida / "correcoes.csv", index=False)
 
-    `run` traz: dataset, modelo, sufixo, colunas, mascara (DataFrame), corrigido
-    (DataFrame final), deteccao_metricas, correcao_metricas, trilhas,
-    regras_deteccao, log_mascara. Quando o loop de refinamento roda (N>1),
-    tambem: iteracoes_deteccao (int), historico_deteccao e orcamento_deteccao
-    (por coluna). Com N=1 esses campos ficam vazios e a cadeias_deteccao.md sai
-    byte-identica ao 1-passe.
-    """
-    run["mascara"].to_csv(pasta / "mascara.csv", index=False)
-    run["corrigido"].to_csv(pasta / "correcoes.csv", index=False)
-
-    (pasta / "deteccao_metricas.json").write_text(
-        json.dumps(run["deteccao_metricas"], indent=2, ensure_ascii=False),
-        encoding="utf-8",
+    (saida / "deteccao_metricas.json").write_text(
+        json.dumps(medida["deteccao"], indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    (pasta / "correcao_metricas.json").write_text(
-        json.dumps(run["correcao_metricas"], indent=2, ensure_ascii=False),
-        encoding="utf-8",
+    (saida / "correcao_metricas.json").write_text(
+        json.dumps(medida["correcao"], indent=2, ensure_ascii=False), encoding="utf-8"
     )
+    (saida / "cascata.md").write_text(_cascata_md(trabalhos), encoding="utf-8")
+    (saida / "cadeias_deteccao.md").write_text(_cadeias_md(trabalhos), encoding="utf-8")
 
-    # -------- cascata.md: qual camada resolveu cada coluna + contagem ----------
+
+def _titulo(assunto: str) -> str:
+    """Cabecalho comum dos .md, com o dataset e a fatia do run."""
+    marca = f" (sufixo {config.SUFIXO})" if config.SUFIXO else ""
+    return f"# {assunto} -- `{config.DATASET}`{marca}"
+
+
+def _cascata_md(trabalhos: list) -> str:
+    """Qual camada resolveu cada coluna, com a contagem que fecha o invariante."""
     linhas = [
-        f"# Cascata de correcao -- `{run['dataset']}`"
-        + (f" (sufixo {run['sufixo']})" if run.get("sufixo") else ""),
-        f"\nModelo `{run['modelo']}`\n",
+        _titulo("Cascata de correcao"),
+        f"\nModelo `{config.MODELO_LLM}`\n",
         "\n| Coluna | Marcadas | Codigo | FD | Nao resolvida | Soma confere |",
         "|---|---|---|---|---|---|",
     ]
-    for nome in run["colunas"]:
-        t = run["trilhas"][nome]
+    for trabalho in trabalhos:
+        t = trabalho.correcao.trilha
         c = t["contagem"]
         soma = c["codigo"] + c["fd"] + c["nao_resolvida"]
         confere = "sim" if soma == t["marcadas"] else f"NAO ({soma}!={t['marcadas']})"
         linhas.append(
-            f"| `{nome}` | {t['marcadas']} | {c['codigo']} | {c['fd']} | "
-            f"{c['nao_resolvida']} | {confere} |"
+            f"| `{trabalho.coluna.nome}` | {t['marcadas']} | {c['codigo']} | "
+            f"{c['fd']} | {c['nao_resolvida']} | {confere} |"
         )
 
-    for nome in run["colunas"]:
-        t = run["trilhas"][nome]
-        linhas.append(f"\n---\n\n## `{nome}`\n")
+    for trabalho in trabalhos:
+        t = trabalho.correcao.trilha
+        linhas.append(f"\n---\n\n## `{trabalho.coluna.nome}`\n")
         linhas.append(
             f"- gate camada 1 (codigo, `{t['regra_codigo_tipo']}`): "
             f"{'PASSOU' if t['gate_codigo'] else 'reprovou'}"
@@ -106,35 +101,31 @@ def escrever_e2e(pasta: Path, run: dict) -> None:
         if t["log"]:
             linhas.append(f"- log ({len(t['log'])} entradas): valores nao enviados / erros registrados")
 
-    (pasta / "cascata.md").write_text("\n".join(linhas), encoding="utf-8")
+    return "\n".join(linhas)
 
-    # -------- cadeias_deteccao.md ---------------------------------------------
-    # O bloco base (por coluna) e' identico ao 1-passe. O historico do loop so'
-    # e' acrescentado quando N>1 -- com N=1 a saida fica byte-identica ao atual.
-    n_iter = int(run.get("iteracoes_deteccao", 1) or 1)
-    historico_det = run.get("historico_deteccao", {}) or {}
-    orcamento_det = run.get("orcamento_deteccao", {}) or {}
+
+def _cadeias_md(trabalhos: list) -> str:
+    """Cadeia, criterio e codigo de deteccao de cada coluna, com o refinamento."""
+    # O bloco por coluna e' o do 1-passe; o historico do loop so' entra com N>1.
     partes = [
-        f"# Cadeias de deteccao -- `{run['dataset']}`"
-        + (f" (sufixo {run['sufixo']})" if run.get("sufixo") else ""),
+        _titulo("Cadeias de deteccao"),
         f"\nDeteccao INTRA-COLUNA (a regra ve um escalar, nao a linha). "
-        f"Modelo `{run['modelo']}`.\n",
+        f"Modelo `{config.MODELO_LLM}`.\n",
     ]
-    for nome in run["colunas"]:
-        regra = run["regras_deteccao"][nome]
-        det = run["deteccao_metricas"].get(nome, {})
-        partes.append(f"\n---\n\n## `{nome}`\n")
+    for trabalho in trabalhos:
+        detector = trabalho.detector
+        det = (trabalho.medida or {}).get("deteccao", {})
+        partes.append(f"\n---\n\n## `{trabalho.coluna.nome}`\n")
         partes.append(
-            f"**Erro provavel:** {'sim' if regra.erro_provavel else 'nao'} &nbsp;|&nbsp; "
+            f"**Erro provavel:** {'sim' if detector.erro_provavel else 'nao'} &nbsp;|&nbsp; "
             f"**P:** {_fmt_pct(det.get('precisao'))} &nbsp;|&nbsp; "
             f"**R:** {_fmt_pct(det.get('recall'))} &nbsp;|&nbsp; "
             f"**F1:** {_fmt_pct(det.get('f1'))}\n"
         )
-        partes.append(f"**Criterio (regex documental):** `{regra.condicao_regex or '(nenhuma)'}`\n")
-        partes.append(f"**Cadeia:**\n\n{regra.cadeia}\n")
-        partes.append("**Codigo de deteccao:**\n\n```python\n" + (regra.codigo or "") + "\n```\n")
-        if n_iter > 1:
-            partes.append(_bloco_historico_deteccao(
-                historico_det.get(nome, []), orcamento_det.get(nome)))
+        partes.append(f"**Criterio (regex documental):** `{detector.condicao_regex or '(nenhuma)'}`\n")
+        partes.append(f"**Cadeia:**\n\n{detector.cadeia}\n")
+        partes.append("**Codigo de deteccao:**\n\n```python\n" + (detector.codigo or "") + "\n```\n")
+        if config.ITERACOES_DETECCAO > 1:
+            partes.append(_bloco_refinamento(detector.historico, detector.orcamento))
 
-    (pasta / "cadeias_deteccao.md").write_text("\n".join(partes), encoding="utf-8")
+    return "\n".join(partes)

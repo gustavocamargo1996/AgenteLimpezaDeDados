@@ -105,63 +105,57 @@ def _formatar_amostra(representantes_sujos: list[str], contagem: dict) -> str:
     return "\n".join(linhas)
 
 
-def gerar_regra_deteccao(
-    coluna: str,
-    representantes_sujos: list[str],
-    total_linhas: int,
-    total_distintos: int,
-    contagem: dict | None = None,
-    agente=None,
-) -> dict:
-    """Um passe de LLM: SO' representantes sujos, sem MI, sem clean.
-
-    Devolve {regra, funcao, erro, tentativas}. `funcao` e' `detectar` viva se o
-    codigo passou no portao; se falhou ate o fim, cai para DETECTA_NADA (marca
-    zero celulas) -- nunca inventa deteccao.
-    """
+def gerar_regra_deteccao(coluna, amostra, agente=None) -> Detector:
+    """Um passe de LLM sobre os representantes SUJOS da coluna, sem ver o clean."""
     agente = agente or construir_agente()
-    contagem = contagem or {}
     prompt = ChatPromptTemplate.from_messages([("system", SISTEMA), ("human", HUMANO)])
     regra: RegraDeteccao = (prompt | agente).invoke(
         {
-            "coluna": coluna,
-            "amostra": _formatar_amostra(representantes_sujos, contagem),
-            "total_linhas": total_linhas,
-            "total_distintos": total_distintos,
+            "coluna": coluna.nome,
+            "amostra": _formatar_amostra(amostra.representantes, coluna.contagem),
+            "total_linhas": amostra.total_linhas,
+            "total_distintos": amostra.total_distintos,
         }
     )
 
-    codigo = (regra.codigo or "").strip()
     funcao = None
-    erro = ""
-    if codigo:
+    if (regra.codigo or "").strip():
         try:
-            funcao = sandbox.materializar(
-                codigo, nome_funcao="detectar", nome_argumento="col",
-                series_mode=True,
-            )
+            funcao = materializar(regra.codigo.strip())
             sandbox.testar_fumaca(
                 funcao, pd.Series(_AMOSTRAS_FUMACA), series_mode=True
             )
-        except sandbox.CodigoRejeitado as exc:
-            erro = str(exc)
+        except sandbox.CodigoRejeitado:
             funcao = None
 
     if funcao is None:
-        funcao = sandbox.materializar(
-            DETECTA_NADA, nome_funcao="detectar", nome_argumento="col",
-            series_mode=True,
-        )
+        # Codigo reprovado no portao: marca zero celulas, nunca inventa deteccao.
+        funcao = materializar(DETECTA_NADA)
         regra.codigo = DETECTA_NADA
+    return detector_de(regra, funcao)
 
-    return {"regra": regra, "funcao": funcao, "erro": erro, "tentativas": 1}
+
+def materializar(codigo: str):
+    """Compila `detectar(col)` pelo portao AST do sandbox, em modo Series."""
+    return sandbox.materializar(codigo, nome_funcao="detectar",
+                                nome_argumento="col", series_mode=True)
+
+
+def detector_de(regra: RegraDeteccao, funcao) -> Detector:
+    """Embrulha a regra validada e sua funcao viva num Detector."""
+    return Detector(
+        codigo=regra.codigo or DETECTA_NADA,
+        funcao=funcao,
+        cadeia=regra.cadeia,
+        erro_provavel=bool(regra.erro_provavel),
+        condicao_regex=regra.condicao_regex,
+    )
 
 
 def detector_nulo(motivo: str = "") -> Detector:
     """Detector que nao marca celula nenhuma, para coluna que falhou."""
     return Detector(
         codigo=DETECTA_NADA,
-        funcao=sandbox.materializar(DETECTA_NADA, nome_funcao="detectar",
-                                    nome_argumento="col", series_mode=True),
+        funcao=materializar(DETECTA_NADA),
         cadeia=motivo or "coluna nao marcada",
     )

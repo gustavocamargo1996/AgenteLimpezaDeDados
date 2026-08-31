@@ -2,7 +2,7 @@
 import pandas as pd
 
 
-def construir_mascara(
+def aplicar_detectores(
     df: pd.DataFrame, funcoes_por_coluna: dict, log: list | None = None
 ) -> pd.DataFrame:
     """Aplica `detectar(col)` por COLUNA e devolve mascara 0/1 no shape do df.
@@ -53,4 +53,16 @@ def construir_mascara(
             )
             continue
         mascara[coluna] = marca.astype(int)
+    return mascara
+
+
+def construir_mascara(trabalhos: list, tabela) -> pd.DataFrame:
+    """Aplica o detector de cada trabalho e devolve a mascara 0/1 da tabela suja."""
+    log: list = []
+    mascara = aplicar_detectores(
+        tabela.sujo, {t.coluna.nome: t.detector.funcao for t in trabalhos}, log
+    )
+    for entrada in log:
+        print(f"  {entrada['coluna']}: deteccao descartada ({entrada['motivo']})",
+              flush=True)
     return mascara

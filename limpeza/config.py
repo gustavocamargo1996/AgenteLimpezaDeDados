@@ -11,6 +11,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 # --- Fontes externas (reaproveitadas do clone do ZeroDC, somente leitura) ---
 ZERODC_DIR = Path(os.getenv("ZERODC_DIR", r"F:\Projetos\GC\ZeroDC"))
 DATASET = os.getenv("DATASET", "beers")
+SUFIXO = None  # fatia do dataset: "300" usa {nome}_dirty_300.csv
 DIR_DATASET = ZERODC_DIR / "datasets" / DATASET
 CSV_SUJO = DIR_DATASET / f"{DATASET}_dirty.csv"
 CSV_LIMPO = DIR_DATASET / f"{DATASET}_clean.csv"

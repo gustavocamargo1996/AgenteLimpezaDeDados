@@ -39,6 +39,7 @@ from limpeza import config, deteccao, empacotar, metricas, sandbox
 from limpeza.correcao import cascata, fd
 from limpeza.deteccao import oraculo, refino, regra
 from limpeza.esquemas import DependenciaFuncional, RegraDeteccao
+from limpeza.tipos import Coluna
 
 OK, FALHA = "  [ok] ", "  [!!] "
 
@@ -240,7 +241,7 @@ def teste_construir_mascara(c: Contador):
         "    return col.astype(str).str.contains('%', regex=False, na=False)\n"
     )
     log = []
-    mask = deteccao.construir_mascara(df, {"c": f_pct}, log)
+    mask = deteccao.aplicar_detectores(df, {"c": f_pct}, log)
     c.check(list(mask["c"]) == [0, 1, 0] and set(mask["c"].unique()) <= {0, 1},
             f"mascara marca so' a celula com '%': {list(mask['c'])}")
     c.check(log == [], "sem log quando detectar devolve Series booleana valida")
@@ -248,7 +249,7 @@ def teste_construir_mascara(c: Contador):
     # Retorno nao-Series (escalar) -> coluna INTEIRA 0 + 1 log por-coluna.
     f_escalar = _mat_det("def detectar(col):\n    return True\n")
     log2 = []
-    mask2 = deteccao.construir_mascara(df, {"c": f_escalar}, log2)
+    mask2 = deteccao.aplicar_detectores(df, {"c": f_escalar}, log2)
     c.check(list(mask2["c"]) == [0, 0, 0] and len(log2) == 1
             and log2[0]["coluna"] == "c" and "nao-Series" in log2[0]["motivo"],
             f"retorno nao-Series -> coluna 0 + 1 log por-coluna: {log2}")
@@ -260,7 +261,7 @@ def teste_construir_mascara(c: Contador):
     def _f_tam_errado(coluna):
         return pd.Series([True])
     log3 = []
-    mask3 = deteccao.construir_mascara(df, {"c": _f_tam_errado}, log3)
+    mask3 = deteccao.aplicar_detectores(df, {"c": _f_tam_errado}, log3)
     c.check(list(mask3["c"]) == [0, 0, 0] and len(log3) == 1
             and "tamanho divergente" in log3[0]["motivo"],
             f"tamanho divergente -> coluna 0 + log: {log3}")
@@ -268,7 +269,7 @@ def teste_construir_mascara(c: Contador):
     # DETECTA_NADA (col.isin([])) -> tudo 0, sem log.
     f_nada = _mat_det(deteccao.DETECTA_NADA)
     log4 = []
-    mask4 = deteccao.construir_mascara(df, {"c": f_nada}, log4)
+    mask4 = deteccao.aplicar_detectores(df, {"c": f_nada}, log4)
     c.check(list(mask4["c"]) == [0, 0, 0] and log4 == [],
             f"DETECTA_NADA (col.isin([])) marca nada, sem log: {list(mask4['c'])}")
 
@@ -281,11 +282,13 @@ def teste_construir_mascara(c: Contador):
     import io
     import tokenize
 
-    params = set(inspect.signature(deteccao.construir_mascara).parameters)
+    params = set(inspect.signature(deteccao.aplicar_detectores).parameters)
+    params |= set(inspect.signature(deteccao.construir_mascara).parameters)
     c.check("clean" not in params and "limpo" not in params,
             f"assinatura sem parametro clean/limpo: {sorted(params)}")
 
-    fonte = inspect.getsource(deteccao.construir_mascara)
+    fonte = (inspect.getsource(deteccao.aplicar_detectores)
+             + inspect.getsource(deteccao.construir_mascara))
     nomes = set()
     for tok in tokenize.generate_tokens(io.StringIO(fonte).readline):
         if tok.type == tokenize.NAME:
@@ -349,7 +352,8 @@ def teste_cascata_fd_passa(c: Contador):
     def fake_camada_codigo(coluna, rot, agentes):
         # funcao None -> gate reprova -> tudo escala para a camada 2. 3-tupla:
         # codigo_str irrelevante (nao entra na trilha porque o gate reprova).
-        return types.SimpleNamespace(transformacao=types.SimpleNamespace(tipo="nenhuma")), None, ""
+        return (types.SimpleNamespace(transformacao=types.SimpleNamespace(tipo="nenhuma"),
+                                      descricao_padrao="fake: gate reprova"), None, "")
 
     def fake_candidatos(df_, alvo, limiar=None):
         return ["brewery"]  # ha determinante candidato -> camada 2 roda
@@ -375,7 +379,7 @@ def teste_cascata_fd_passa(c: Contador):
         fake_camada_codigo, fake_candidatos, fake_propor, fake_validar,
         fake_aplicar)
     try:
-        correcoes, trilha = cascata.rodar_cascata(
+        correcoes, trilha = cascata.rodar_coluna(
             "state", df, mascara_col, rotulados, mascara_completa, agentes={},
         )
     finally:
@@ -404,7 +408,7 @@ def _gerar_e_importar(nome, detectores, plano, colunas):
 
     pasta = Path(tempfile.mkdtemp(prefix="limpador_teste_"))
     caminho = pasta / f"{nome}.py"
-    empacotar.gerar_limpador(
+    empacotar.escrever_limpador(
         caminho=caminho, dataset="teste",
         detectores_codigo=detectores, plano_correcao=plano, colunas=colunas,
     )
@@ -630,13 +634,30 @@ def teste_montar_feedback(c: Contador):
             "cumulativo: inclui todos os rotulos acumulados (3 linhas)")
 
 
+def _coluna_teste(nome, sujo_col, limpo_col):
+    """Coluna sintetica para os testes do loop de refinamento."""
+    return Coluna(nome=nome, sujo=sujo_col, limpo=limpo_col,
+                  valores_distintos=sorted(sujo_col.unique().tolist()),
+                  contagem=sujo_col.value_counts().to_dict())
+
+
+def _refinar(coluna, detector, agente, emb, iteracoes=1, amostras=2):
+    """Roda o refinamento com o orcamento do teste fixado no config."""
+    antes = (config.ITERACOES_DETECCAO, config.AMOSTRAS_POR_ITERACAO)
+    config.ITERACOES_DETECCAO, config.AMOSTRAS_POR_ITERACAO = iteracoes, amostras
+    try:
+        return deteccao.refinar_regra_deteccao(detector, coluna, agente, emb=emb)
+    finally:
+        config.ITERACOES_DETECCAO, config.AMOSTRAS_POR_ITERACAO = antes
+
+
 def teste_refinar_deteccao(c: Contador):
     secao("10. refinar_regra_deteccao: fake agent (sucesso muda; rejeicao mantem)")
     emb = FakeEmbedder()
     # ounces-like: '12.0 oz'/'16.0 oz' sao erros (limpo '12'/'16'); '12'/'16' ok.
     sujo_col = pd.Series(["12.0 oz", "16.0 oz", "12", "16"])
     limpo_col = pd.Series(["12", "16", "12", "16"])
-    valores = sorted(sujo_col.unique().tolist())
+    col = _coluna_teste("ounces", sujo_col, limpo_col)
 
     funcao0 = _mat_det(deteccao.DETECTA_NADA)
     regra0 = RegraDeteccao(erro_provavel=False, condicao_regex=None,
@@ -650,23 +671,19 @@ def teste_refinar_deteccao(c: Contador):
             cadeia="o feedback disse que '12.0 oz' e' erro; flago o sufixo oz",
         )
 
-    saida = deteccao.refinar_regra_deteccao(
-        coluna="ounces", funcao=funcao0, regra=regra0,
-        sujo_col=sujo_col, limpo_col=limpo_col, valores_distintos=valores,
-        embedder=emb, iteracoes=1, amostras_por_iter=2,
-        agente_update=RunnableLambda(fake_ok),
-    )
-    f = saida["funcao"]
+    det = _refinar(col, regra.detector_de(regra0, funcao0),
+                   RunnableLambda(fake_ok), emb)
+    f = det.funcao
     c.check(f is not funcao0
             and oraculo._classificar(f, ["12.0 oz", "12"]) == [True, False],
             "sucesso: funcao final DIFERE, marca '12.0 oz' e NAO marca '12'")
-    passo = saida["historico"][0]
-    c.check(len(saida["historico"]) == 1 and passo["mudou"] is True
+    passo = det.historico[0]
+    c.check(len(det.historico) == 1 and passo["mudou"] is True
             and passo["status"] == "aplicada",
             f"historico com 1 passo, mudou=sim, status={passo['status']}")
-    c.check(saida["orcamento"]["n_valores"] >= 1 and saida["orcamento"]["n_celulas"] >= 1,
-            f"orcamento registrado: {saida['orcamento']['n_valores']}v/"
-            f"{saida['orcamento']['n_celulas']}c")
+    c.check(det.orcamento["n_valores"] >= 1 and det.orcamento["n_celulas"] >= 1,
+            f"orcamento registrado: {det.orcamento['n_valores']}v/"
+            f"{det.orcamento['n_celulas']}c")
 
     # --- REJEICAO: o fake devolve regex invalida (Series) -> falha no smoke,
     # mantem a regra anterior. `str.contains` passa na allowlist, mas '(' e'
@@ -678,15 +695,11 @@ def teste_refinar_deteccao(c: Contador):
             cadeia="regex proposital invalida (paren sem fechar)",
         )
 
-    saida_r = deteccao.refinar_regra_deteccao(
-        coluna="ounces", funcao=funcao0, regra=regra0,
-        sujo_col=sujo_col, limpo_col=limpo_col, valores_distintos=valores,
-        embedder=emb, iteracoes=1, amostras_por_iter=2,
-        agente_update=RunnableLambda(fake_ruim),
-    )
-    c.check(saida_r["funcao"] is funcao0 and saida_r["regra"] is regra0,
-            "rejeicao: mantem EXATAMENTE a funcao/regra anterior (mesmos objetos)")
-    passo_r = saida_r["historico"][0]
+    det_r = _refinar(col, regra.detector_de(regra0, funcao0),
+                     RunnableLambda(fake_ruim), emb)
+    c.check(det_r.funcao is funcao0 and det_r.codigo == regra0.codigo,
+            "rejeicao: mantem EXATAMENTE a funcao/codigo anterior (mesma funcao viva)")
+    passo_r = det_r.historico[0]
     c.check(passo_r["mudou"] is False and passo_r["status"].startswith("rejeitada"),
             f"historico marca rejeicao: {passo_r['status']}")
 
@@ -804,7 +817,7 @@ def teste_guarda_e_piso(c: Contador):
     # deterministica independente da ordem de amostragem.
     sujo_col = pd.Series(["A", "B", "C", "D"])
     limpo_col = pd.Series(["A_ok", "B", "C", "D"])
-    valores = sorted(sujo_col.unique().tolist())
+    col = _coluna_teste("col", sujo_col, limpo_col)
 
     def novo_nada():
         return _mat_det(deteccao.DETECTA_NADA)
@@ -824,15 +837,11 @@ def teste_guarda_e_piso(c: Contador):
 
     funcao0 = novo_nada()
     regra0 = regra_nada()
-    saida_rej = deteccao.refinar_regra_deteccao(
-        coluna="col", funcao=funcao0, regra=regra0,
-        sujo_col=sujo_col, limpo_col=limpo_col, valores_distintos=valores,
-        embedder=emb, iteracoes=1, amostras_por_iter=4,
-        agente_update=RunnableLambda(fake_ampla),
-    )
-    c.check(saida_rej["funcao"] is funcao0 and saida_rej["regra"] is regra0,
-            "guarda (A) rejeita ampla: mantem a resident anterior (mesmos objetos)")
-    passo_rej = saida_rej["historico"][0]
+    det_rej = _refinar(col, regra.detector_de(regra0, funcao0),
+                       RunnableLambda(fake_ampla), emb, amostras=4)
+    c.check(det_rej.funcao is funcao0 and det_rej.codigo == regra0.codigo,
+            "guarda (A) rejeita ampla: mantem a resident anterior (mesma funcao viva)")
+    passo_rej = det_rej.historico[0]
     c.check(passo_rej["mudou"] is False
             and passo_rej["status"].startswith("rejeitada por precisao"),
             f"historico distingue rejeicao por precisao: {passo_rej['status']}")
@@ -847,18 +856,14 @@ def teste_guarda_e_piso(c: Contador):
         )
 
     funcao0b = novo_nada()
-    saida_ac = deteccao.refinar_regra_deteccao(
-        coluna="col", funcao=funcao0b, regra=regra_nada(),
-        sujo_col=sujo_col, limpo_col=limpo_col, valores_distintos=valores,
-        embedder=emb, iteracoes=1, amostras_por_iter=4,
-        agente_update=RunnableLambda(fake_precisa),
-    )
-    f_ac = saida_ac["funcao"]
+    det_ac = _refinar(col, regra.detector_de(regra_nada(), funcao0b),
+                      RunnableLambda(fake_precisa), emb, amostras=4)
+    f_ac = det_ac.funcao
     c.check(f_ac is not funcao0b
             and oraculo._classificar(f_ac, ["A", "B"]) == [True, False],
             "guarda (A) aceita regra precisa (precisao 1.0): funcao muda, marca so' 'A'")
-    c.check(saida_ac["historico"][0]["status"] == "aplicada",
-            f"aceita registra status 'aplicada': {saida_ac['historico'][0]['status']}")
+    c.check(det_ac.historico[0]["status"] == "aplicada",
+            f"aceita registra status 'aplicada': {det_ac.historico[0]['status']}")
 
     # --- PISO (B): resident FINAL ampla + revisao ampla (rejeitada pela guarda)
     # -> ao fim, resident cai para DETECTA_NADA (nao a ampla). ---
@@ -866,23 +871,19 @@ def teste_guarda_e_piso(c: Contador):
     funcao0_ampla = _mat_det(ampla_cod)
     regra0_ampla = RegraDeteccao(erro_provavel=True, condicao_regex=None,
                                  codigo=ampla_cod, cadeia="resident ja ampla")
-    saida_piso = deteccao.refinar_regra_deteccao(
-        coluna="col", funcao=funcao0_ampla, regra=regra0_ampla,
-        sujo_col=sujo_col, limpo_col=limpo_col, valores_distintos=valores,
-        embedder=emb, iteracoes=1, amostras_por_iter=4,
-        agente_update=RunnableLambda(fake_ampla),
-    )
-    f_piso = saida_piso["funcao"]
+    det_piso = _refinar(col, regra.detector_de(regra0_ampla, funcao0_ampla),
+                        RunnableLambda(fake_ampla), emb, amostras=4)
+    f_piso = det_piso.funcao
     c.check(oraculo._classificar(f_piso, ["A", "B", "C"]) == [False, False, False],
             "piso (B): resident final ampla derrubada -> funcao marca NADA")
-    c.check(saida_piso["regra"].codigo == deteccao.DETECTA_NADA,
-            f"piso (B): regra.codigo espelha DETECTA_NADA: {saida_piso['regra'].codigo!r}")
-    entradas_piso = [p for p in saida_piso["historico"] if p["status"].startswith("piso")]
+    c.check(det_piso.codigo == deteccao.DETECTA_NADA,
+            f"piso (B): detector.codigo espelha DETECTA_NADA: {det_piso.codigo!r}")
+    entradas_piso = [p for p in det_piso.historico if p["status"].startswith("piso")]
     c.check(len(entradas_piso) == 1 and "iteracao" in entradas_piso[0],
             "piso (B): 1 entry de piso no historico, com chave 'iteracao' (contrato do relatorio)")
     # O entry do piso tem O MESMO CONJUNTO DE CHAVES das entradas do laco -- senao
-    # relatorio._bloco_historico_deteccao quebraria ao vivo.
-    chaves_laco = set(saida_piso["historico"][0].keys())
+    # relatorio._bloco_refinamento quebraria ao vivo.
+    chaves_laco = set(det_piso.historico[0].keys())
     c.check(set(entradas_piso[0].keys()) == chaves_laco,
             f"entry de piso tem as mesmas chaves das entradas do laco: {sorted(entradas_piso[0].keys())}")
 
@@ -890,7 +891,7 @@ def teste_guarda_e_piso(c: Contador):
     # NAO rejeitada, piso NAO dispara (coluna muito-suja nao e' punida). ---
     sujo_oz = pd.Series(["12.0 oz", "16.0 oz", "20.0 oz"])
     limpo_oz = pd.Series(["12", "16", "20"])  # 100% erro real
-    valores_oz = sorted(sujo_oz.unique().tolist())
+    col_oz = _coluna_teste("ounces", sujo_oz, limpo_oz)
 
     def fake_oz(_prompt_value):
         return RegraDeteccao(
@@ -900,18 +901,14 @@ def teste_guarda_e_piso(c: Contador):
         )
 
     funcao0_oz = novo_nada()
-    saida_oz = deteccao.refinar_regra_deteccao(
-        coluna="ounces", funcao=funcao0_oz, regra=regra_nada(),
-        sujo_col=sujo_oz, limpo_col=limpo_oz, valores_distintos=valores_oz,
-        embedder=emb, iteracoes=1, amostras_por_iter=3,
-        agente_update=RunnableLambda(fake_oz),
-    )
-    f_oz = saida_oz["funcao"]
+    det_oz = _refinar(col_oz, regra.detector_de(regra_nada(), funcao0_oz),
+                      RunnableLambda(fake_oz), emb, amostras=3)
+    f_oz = det_oz.funcao
     c.check(f_oz is not funcao0_oz
             and oraculo._classificar(f_oz, ["12.0 oz"]) == [True],
             "ounces-like: regra que marca ~100% (precisao 1.0) e' ACEITA")
-    c.check(saida_oz["historico"][0]["status"] == "aplicada"
-            and not any(p["status"].startswith("piso") for p in saida_oz["historico"]),
+    c.check(det_oz.historico[0]["status"] == "aplicada"
+            and not any(p["status"].startswith("piso") for p in det_oz.historico),
             "ounces-like: status 'aplicada' e NENHUM piso disparado")
 
 

@@ -29,6 +29,8 @@ Contrato de `gerar_limpador`:
 import re
 from pathlib import Path
 
+from . import config
+
 # Idioma Series alinhado a `col`, tudo-False -- espelha deteccao.DETECTA_NADA.
 # Usado quando uma coluna nao trouxe codigo de deteccao (defensivo).
 _DETECTA_NADA = "def detectar(col):\n    return col.isin([])\n"
@@ -242,7 +244,7 @@ def _montar_cabecalho(origem: str, dataset: str, colunas: list[str],
     return "\n".join(linhas)
 
 
-def gerar_limpador(
+def escrever_limpador(
     caminho,
     dataset: str,
     detectores_codigo: dict,
@@ -337,3 +339,15 @@ def gerar_limpador(
     texto = "\n".join(blocos).rstrip() + "\n"
     caminho.write_text(texto, encoding="utf-8")
     return caminho
+
+
+def gerar_limpador(trabalhos: list, saida: Path) -> Path:
+    """Empacota os detectores e os planos de correcao dos trabalhos num limpador .py."""
+    return escrever_limpador(
+        caminho=saida,
+        dataset=config.DATASET,
+        detectores_codigo={t.coluna.nome: t.detector.codigo for t in trabalhos},
+        plano_correcao={t.coluna.nome: (t.correcao.passos if t.correcao else [])
+                        for t in trabalhos},
+        colunas=[t.coluna.nome for t in trabalhos],
+    )
