@@ -9,6 +9,7 @@ Os caminhos em **Onde** são os do pacote reestruturado (`limpeza/...`), não os
 do `poc/...` atual — este documento é escrito para sobreviver ao rename da
 Task 6.
 
+<a id="carga-literal"></a>
 ## Carga literal
 
 **Decisão:** `pd.read_csv(dtype=str, keep_default_na=False, na_values=[])` na
@@ -23,6 +24,7 @@ qualquer algoritmo rodar.
 **Onde:** `limpeza/dados.py::carregar` (hoje `poc/dados.py:37-57`, comentário
 "DESVIO DELIBERADO DO ZERODC" nas linhas 40-48).
 
+<a id="kmeans-sobre-distintos"></a>
 ## KMeans sobre distintos
 
 **Decisão:** `amostragem.selecionar` roda o KMeans sobre `valores_distintos`
@@ -38,20 +40,32 @@ repetição do mesmo valor sujo.
 `poc/config.py:29-34`) e `limpeza/amostragem.py::selecionar` (hoje
 `poc/amostragem.py:17-46`).
 
+<a id="representantes-tipico-e-atipico"></a>
 ## Representantes típico e atípico
 
 **Decisão:** por cluster, `selecionar` escolhe dois pontos — o mais distante
 do centróide (mais atípico) e o mais próximo (mais típico) — em vez de uma
 amostra aleatória do cluster.
 
-**Por quê:** o atípico expõe a corrupção (é onde o erro se manifesta dentro
-do cluster); o típico ancora a forma normal da coluna, servindo de contraste.
-Mostrar só um dos dois deixa o agente sem base de comparação (só típico) ou
-sem contexto do que é "normal" (só atípico).
+**Por quê:** o mecanismo é uma medida, não uma escolha estética: por cluster,
+`selecionar` calcula `np.linalg.norm(matriz[membros] - centro)` sobre os
+membros do grupo e usa `argmax` (mais distante do centróide → mais atípico) e
+`argmin` (mais próximo → mais típico) — cada representante entra por
+distância no espaço de embeddings, não por amostragem aleatória. A dupla só
+cumpre a função quando o cluster mistura sujo e limpo; o caso `ounces` mostra
+onde essa premissa quebra: as mesmas 2.410 células que colapsam em 25 valores
+distintos (ver "KMeans sobre distintos") estão 100% corrompidas, então a
+forma corrompida vira a própria norma do cluster — não sobra um "típico
+limpo" para o atípico contrastar, e a detecção correspondente dá F1=0
+(`poc/deteccao.py:163-166`, ver "Ponto cego da corrupção universal"). É essa
+mesma falha que `N_CLUSTERS=6`/`MAX_REPRESENTANTES=12` sozinhos não resolvem,
+e que motiva o loop de refinamento com oráculo.
 
 **Onde:** `limpeza/amostragem.py::selecionar` (hoje `poc/amostragem.py:31-39`,
-comentários `# mais atipico` / `# mais tipico`).
+comentários `# mais atipico` / `# mais tipico`, e `poc/amostragem.py:1-10`
+para o limite estrutural declarado no docstring de módulo).
 
+<a id="portao-ast"></a>
 ## Portão AST
 
 **Decisão:** todo código Python gerado por LLM passa por um portão AST
@@ -69,10 +83,11 @@ tem como alcançar nada fora dele.
 **Onde:** `limpeza/sandbox.py::validar`/`materializar` (hoje
 `poc/sandbox.py:1-27` para a justificativa, `65-155` para a implementação).
 
+<a id="modo-serie"></a>
 ## Modo série
 
 **Decisão:** `series_mode=True` acrescenta ao portão uma allowlist FECHADA de
-16 atributos (`_ATRIBUTOS_SERIE`) — todo `ast.Attribute` do corpo da função
+17 atributos (`_ATRIBUTOS_SERIE`) — todo `ast.Attribute` do corpo da função
 `detectar(col)` precisa ter `.attr` nesse conjunto, ou o código é rejeitado.
 
 **Por quê:** sem essa allowlist, `detectar(col)` — que recebe a coluna inteira
@@ -85,6 +100,7 @@ agir — duas barreiras independentes para o mesmo risco.
 **Onde:** `limpeza/sandbox.py` (hoje `poc/sandbox.py:10-26` para a
 justificativa, `51-62` para a allowlist, `117-124` para o gate).
 
+<a id="orcamento-vs-gabarito"></a>
 ## Orçamento vs. gabarito
 
 **Decisão:** o CSV `--limpo` alimenta 3 papéis distintos e não intercambiáveis
@@ -106,6 +122,7 @@ papéis também estão descritos em
 `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`, seção 3,
 Decisão 4.
 
+<a id="gates-de-100"></a>
 ## Gates de 100%
 
 **Decisão:** nenhuma regra de código (camada 1) e nenhuma FD (camada 2) é
@@ -124,6 +141,7 @@ célula").
 `poc/fd.py:8,113-...`, comentário de módulo "exige 100% no conjunto
 rotulado").
 
+<a id="flag-em-vez-de-chute"></a>
 ## Flag em vez de chute
 
 **Decisão:** célula que nenhuma camada resolve permanece com o valor sujo e
@@ -139,6 +157,7 @@ Sinalizar substitui chutar.
 **Onde:** `limpeza/correcao/cascata.py::rodar_cascata` (hoje
 `poc/cascata.py:75-165`, invariante contábil documentada nas linhas 17-19).
 
+<a id="veredito-contra-o-fallback"></a>
 ## Veredito contra o fallback
 
 **Decisão:** a camada 3 da cascata (fallback por célula via LLM) fica
@@ -155,6 +174,7 @@ de 100%. O fallback não participou de nenhum número publicado da POC.
 `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`, seção 3,
 Decisão 3, e seção 8 "Fora de escopo").
 
+<a id="loop-de-refinamento-com-oraculo"></a>
 ## Loop de refinamento com oráculo
 
 **Decisão:** o loop de active learning com oráculo (hoje `--e2e
@@ -172,6 +192,7 @@ hoje `poc/config.py:52-59`) e `limpeza/deteccao/refino.py` (hoje
 do módulo: 562 das 776 linhas de `poc/deteccao.py` pertencem ao loop de
 refino).
 
+<a id="ponto-cego-da-corrupcao-universal"></a>
 ## Ponto cego da corrupção universal
 
 **Decisão:** aceito como limitação conhecida e fora de escopo (não é
@@ -189,6 +210,7 @@ não existe cluster "limpo" para o atípico contrastar contra.
 `poc/amostragem.py:1-10`) e `limpeza/deteccao/refino.py` (hoje
 `poc/deteccao.py:163-166`).
 
+<a id="deteccao-intra-coluna"></a>
 ## Detecção intra-coluna
 
 **Decisão:** o contrato de detecção é `detectar(col) -> pd.Series[bool]` —
@@ -216,6 +238,7 @@ abaixo é a mesma da seção 9 do design doc:
 **Onde:** ver tabela acima; lista original em
 `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`, seção 9.
 
+<a id="escalonamento-celula-a-celula"></a>
 ## Escalonamento célula a célula
 
 **Decisão:** em cada camada da cascata, uma célula só conta como "resolvida"
@@ -232,6 +255,7 @@ esconderia células que continuam erradas, como se tivessem sido tratadas.
 `poc/cascata.py:6-19`; aplicação nos comentários `# intacta escala` das
 linhas 104 e 123).
 
+<a id="random-state-0"></a>
 ## random_state=0
 
 **Decisão:** o KMeans de `amostragem.selecionar` roda sempre com
