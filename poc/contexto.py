@@ -7,9 +7,9 @@ Replica detection.py:199-220 do ZeroDC (funcao calc_mi_2):
   - normaliza dividindo pelo MAXIMO da linha (o maior MI vira 1.0);
   - arredonda para 1 casa.
 
-Serve para eleger colunas candidatas a determinante na FD (camada 2) e a
-contexto no fallback (camada 3). NAO entra na deteccao intra-coluna -- ali seria
-peso morto, porque a regra ve um escalar, nao a linha.
+Serve para eleger colunas candidatas a determinante na FD (camada 2). NAO entra
+na deteccao intra-coluna -- ali seria peso morto, porque a regra ve um escalar,
+nao a linha.
 """
 from sklearn.metrics import mutual_info_score
 

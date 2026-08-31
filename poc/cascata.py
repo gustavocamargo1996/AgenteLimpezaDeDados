@@ -1,24 +1,22 @@
-"""Orquestracao da cascata de correcao: codigo -> FD -> fallback por celula.
+"""Orquestracao da cascata de correcao: codigo -> FD.
 
 Sobre as celulas com mascara == 1, cada camada tem PORTAO contra o orcamento
-rotulado (sujos + limpos) -- exceto a camada 3, que e' ultimo recurso.
+rotulado (sujos + limpos).
 
-Regra de escalonamento (como correction.py:1000-1002 do ZeroDC, onde
-`mask = dirty != corrections` zera a deteccao das celulas que mudaram):
+Regra de escalonamento (onde `mask = dirty != corrections` zera a deteccao das
+celulas que mudaram):
   - uma celula so' e' considerada resolvida por uma camada se a camada ALTEROU
     seu valor;
   - celula que a camada deixou intacta ESCALA para a proxima;
   - gate reprovado -> TODAS as celulas marcadas escalam.
 
-A camada 3 e' terminal: uma celula ENVIADA ao fallback dentro do teto conta como
-resolvida por fallback (decisao final, mesmo que o valor devolvido coincida com o
-sujo); celulas alem do teto ficam nao-resolvidas (sujas) e sao logadas.
+Celula que nenhuma camada resolve fica nao-resolvida (sujo, flagada).
 
-Invariante contabil (plano secao 8): por coluna,
-    contagem[codigo] + contagem[fd] + contagem[fallback] + contagem[nao_resolvida]
+Invariante contabil: por coluna,
+    contagem[codigo] + contagem[fd] + contagem[nao_resolvida]
     == numero de celulas marcadas.
 """
-from . import config, contexto, fallback_celula, fd as fd_mod, gerador_codigo, identificador_regras
+from . import contexto, fd as fd_mod, gerador_codigo, identificador_regras
 
 
 def _gate_codigo(funcao, rows: list[dict]) -> bool:
@@ -64,12 +62,11 @@ def rodar_cascata(
     mascara_completa,
     agentes: dict,
     mi_threshold: float | None = None,
-    limite_fallback: int | None = None,
 ) -> tuple[dict, dict]:
     """Devolve (correcoes_col, trilha).
 
-    correcoes_col: {indice: valor_final} das celulas resolvidas (codigo/fd/
-    fallback). Celulas nao resolvidas NAO entram -- ficam sujas no fim.
+    correcoes_col: {indice: valor_final} das celulas resolvidas (codigo/fd).
+    Celulas nao resolvidas NAO entram -- ficam sujas no fim.
     trilha: diagnostico por celula e por camada (ver invariante contabil).
     """
     indices_marcados = list(mascara_col[mascara_col == 1].index)
@@ -77,7 +74,7 @@ def rodar_cascata(
 
     correcoes: dict = {}
     trilha_celula = {idx: "nao_resolvida" for idx in indices_marcados}
-    contagem = {"codigo": 0, "fd": 0, "fallback": 0, "nao_resolvida": 0}
+    contagem = {"codigo": 0, "fd": 0, "nao_resolvida": 0}
     pendentes = list(indices_marcados)
     log: list = []
 
@@ -123,29 +120,6 @@ def rodar_cascata(
                     restantes.append(idx)  # intacta escala
             pendentes = restantes
 
-    # -------- Camada 3: fallback por celula (terminal) -------------------------
-    # So' roda sob config.USAR_FALLBACK (default False). Desligada, os pendentes
-    # que codigo/FD nao cobriram permanecem 'nao_resolvida' (flag), contagem
-    # 'fallback' fica 0 e nenhuma chamada de LLM da camada 3 acontece.
-    fallback_chamadas = 0
-    if config.USAR_FALLBACK and pendentes:
-        resultado = fallback_celula.aplicar_fallback(
-            coluna, df, pendentes, mascara_completa, candidatos,
-            agente=agentes.get("fallback"), limite=limite_fallback,
-        )
-        fallback_chamadas = resultado["chamadas"]
-        log.extend(resultado["log"])
-        enviados = set(resultado["correcoes"].keys())
-        restantes = []
-        for idx in pendentes:
-            if idx in enviados:
-                correcoes[idx] = resultado["correcoes"][idx]
-                trilha_celula[idx] = "fallback"
-                contagem["fallback"] += 1
-            else:
-                restantes.append(idx)  # alem do teto: fica suja
-        pendentes = restantes
-
     # -------- Sobra: nao resolvida ---------------------------------------------
     contagem["nao_resolvida"] = len(pendentes)
 
@@ -159,7 +133,6 @@ def rodar_cascata(
         "regra_codigo_tipo": regra.transformacao.tipo,
         "gate_fd": gate_fd,
         "fd": fd.model_dump() if fd is not None else None,
-        "fallback_chamadas": fallback_chamadas,
         "log": log,
     }
     return correcoes, trilha

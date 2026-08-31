@@ -26,7 +26,7 @@ for fluxo in (sys.stdout, sys.stderr):
 
 from poc import (  # noqa: E402
     amostragem, avaliacao, cascata, config, dados, deteccao, empacotar,
-    fallback_celula, fd, gerador_codigo, identificador_regras, relatorio, sandbox,
+    fd, gerador_codigo, identificador_regras, relatorio, sandbox,
 )
 from poc.embeddings import Embedder  # noqa: E402
 from poc.esquemas import RegraCorrecao, RegraDeteccao  # noqa: E402
@@ -202,22 +202,21 @@ def rodar_e2e(nomes, sujo, limpo, embedder, args) -> int:
     """Detecta a propria mascara (sem clean) e corrige por cascata.
 
     Fluxo por coluna: deteccao intra-coluna -> mascara 0/1 -> cascata
-    codigo/FD/fallback com portao por camada -> metricas contra clean, excluindo
-    o orcamento rotulado (holdout).
+    codigo/FD com portao por camada -> metricas contra clean, excluindo o
+    orcamento rotulado (holdout).
     """
     modelo = config.MODELO_LLM
     agentes = {
         "especificador": identificador_regras.construir_agente(modelo),
         "codigo": gerador_codigo.construir_agente(modelo),
         "fd": fd.construir_agente(modelo),
-        "fallback": fallback_celula.construir_agente(modelo),
     }
     agente_det = deteccao.construir_agente(modelo)
 
     print(f"[e2e] dataset={args.dataset}"
           + (f" sufixo={args.sufixo}" if args.sufixo else "")
           + f" | {len(sujo)} linhas | colunas={nomes}", flush=True)
-    print(f"[e2e] modelo={modelo} | limite_fallback={args.limite_fallback}"
+    print(f"[e2e] modelo={modelo}"
           + (f" | iteracoes_deteccao={args.iteracoes_deteccao}"
              f" amostras_iter={args.amostras_iter}"
              if args.iteracoes_deteccao > 1 else "")
@@ -320,7 +319,6 @@ def rodar_e2e(nomes, sujo, limpo, embedder, args) -> int:
                 mascara_completa=mascara_completa,
                 agentes=agentes,
                 mi_threshold=config.MI_THRESHOLD,
-                limite_fallback=args.limite_fallback,
             )
         except Exception as exc:  # noqa: BLE001 -- 1 coluna ruim nao derruba o run
             print(f"  [e2e] {nome}: cascata FALHOU ({type(exc).__name__}) "
@@ -329,12 +327,10 @@ def rodar_e2e(nomes, sujo, limpo, embedder, args) -> int:
             correcoes_col = {}
             trilha = {
                 "coluna": nome, "marcadas": len(idx_marc),
-                "contagem": {"codigo": 0, "fd": 0, "fallback": 0,
-                             "nao_resolvida": len(idx_marc)},
+                "contagem": {"codigo": 0, "fd": 0, "nao_resolvida": len(idx_marc)},
                 "trilha_celula": {idx: "nao_resolvida" for idx in idx_marc},
                 "gate_codigo": False, "regra_codigo_tipo": "erro",
                 "gate_fd": None, "fd": None, "codigo_correcao": None,
-                "fallback_chamadas": 0,
                 "log": [{"coluna": nome,
                          "motivo": f"cascata falhou: {type(exc).__name__}: {exc}"}],
             }
@@ -359,7 +355,6 @@ def rodar_e2e(nomes, sujo, limpo, embedder, args) -> int:
         "dataset": args.dataset,
         "modelo": modelo,
         "sufixo": args.sufixo,
-        "limite_fallback": args.limite_fallback,
         "colunas": nomes,
         "mascara": mascara_completa,
         "corrigido": corrigido,
@@ -429,9 +424,6 @@ def main() -> int:
                     help="modo end-to-end: deteccao intra-coluna + cascata de correcao")
     ap.add_argument("--sufixo", default=None,
                     help="fatia do dataset: '300' usa {nome}_dirty_300.csv / _clean_300.csv")
-    ap.add_argument("--limite-fallback", type=int, default=config.LIMITE_FALLBACK,
-                    dest="limite_fallback",
-                    help="teto de chamadas de LLM na camada 3, por coluna (default config.LIMITE_FALLBACK)")
     ap.add_argument("--iteracoes-deteccao", type=int, default=config.ITERACOES_DETECCAO,
                     dest="iteracoes_deteccao",
                     help="(--e2e) iteracoes de refinamento da deteccao com oraculo. "

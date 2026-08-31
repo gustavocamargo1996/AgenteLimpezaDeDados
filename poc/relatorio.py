@@ -197,18 +197,18 @@ def escrever_e2e(pasta: Path, run: dict) -> None:
     linhas = [
         f"# Cascata de correcao -- `{run['dataset']}`"
         + (f" (sufixo {run['sufixo']})" if run.get("sufixo") else ""),
-        f"\nModelo `{run['modelo']}` | limite de fallback: {run.get('limite_fallback')}\n",
-        "\n| Coluna | Marcadas | Codigo | FD | Fallback | Nao resolvida | Soma confere |",
-        "|---|---|---|---|---|---|---|",
+        f"\nModelo `{run['modelo']}`\n",
+        "\n| Coluna | Marcadas | Codigo | FD | Nao resolvida | Soma confere |",
+        "|---|---|---|---|---|---|",
     ]
     for nome in run["colunas"]:
         t = run["trilhas"][nome]
         c = t["contagem"]
-        soma = c["codigo"] + c["fd"] + c["fallback"] + c["nao_resolvida"]
+        soma = c["codigo"] + c["fd"] + c["nao_resolvida"]
         confere = "sim" if soma == t["marcadas"] else f"NAO ({soma}!={t['marcadas']})"
         linhas.append(
             f"| `{nome}` | {t['marcadas']} | {c['codigo']} | {c['fd']} | "
-            f"{c['fallback']} | {c['nao_resolvida']} | {confere} |"
+            f"{c['nao_resolvida']} | {confere} |"
         )
 
     for nome in run["colunas"]:
@@ -226,7 +226,6 @@ def escrever_e2e(pasta: Path, run: dict) -> None:
                 f"- gate camada 2 (FD `{fd.get('determinante')}` -> `{fd.get('dependente')}`): "
                 f"{'PASSOU' if t['gate_fd'] else 'reprovou (nenhuma celula alterada)'}"
             )
-        linhas.append(f"- camada 3 (fallback): {t['fallback_chamadas']} chamada(s) de LLM")
         if t["log"]:
             linhas.append(f"- log ({len(t['log'])} entradas): valores nao enviados / erros registrados")
 

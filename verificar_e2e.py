@@ -321,90 +321,6 @@ def teste_classificar(c: Contador):
             "lista vazia -> []")
 
 
-def teste_cascata_escalonamento(c: Contador):
-    """Invariante #3 (escalonamento) offline: sem API, monkeypatch nas costuras
-    de LLM. Valida 'celula alterada sai, intacta escala' e a contabilidade
-    codigo+fd+fallback+nao_resolvida == marcadas."""
-    secao("6. Cascata: escalonamento e contabilidade (offline)")
-
-    df = pd.DataFrame({"c": ["12 oz", "20", "13 oz", "99"]})
-    mascara_completa = pd.DataFrame({"c": [1, 1, 1, 1]})     # todas marcadas
-    mascara_col = mascara_completa["c"]
-
-    # Camada 1: funcao real (sandbox) que remove ' oz'. Gate passa nos rotulados.
-    funcao = sandbox.materializar(
-        'def corrigir(valor):\n    return re.sub(r"\\s*oz$", "", valor)\n'
-    )
-    regra_fake = types.SimpleNamespace(
-        transformacao=types.SimpleNamespace(tipo="regex_sub")
-    )
-    rotulados = {
-        "rows": [
-            {"indice": 0, "sujo": "12 oz", "limpo": "12", "eh_erro": True},
-            {"indice": 1, "sujo": "20", "limpo": "20", "eh_erro": False},
-        ],
-        "itens": [], "total_linhas": 4, "total_distintos": 4,
-    }
-
-    def fake_camada_codigo(coluna, rot, agentes):
-        # 3-tupla (regra, funcao, codigo_str) -- o codigo_str e' capturado na
-        # trilha quando o gate passa (empacotamento do limpador).
-        return regra_fake, funcao, 'def corrigir(valor):\n    return re.sub(r"\\s*oz$", "", valor)\n'
-
-    def fake_candidatos(df_, alvo, limiar=None):
-        return []  # sem determinante -> camada 2 nao roda
-
-    def fake_fallback(coluna, df_, indices, mascara, colunas, agente=None, limite=None):
-        # teto=1: envia so' o primeiro valor distinto; o resto fica sujo.
-        indices = list(indices)
-        por_valor = {}
-        for i in indices:
-            por_valor.setdefault(df_.at[i, coluna], []).append(i)
-        correcoes, nao_enviados, chamadas = {}, [], 0
-        for _valor, idxs in por_valor.items():
-            if chamadas >= 1:
-                nao_enviados.extend(idxs)
-                continue
-            chamadas += 1
-            for i in idxs:
-                correcoes[i] = ""  # vazio legitimo
-        return {"correcoes": correcoes, "nao_enviados": nao_enviados,
-                "log": [], "chamadas": chamadas}
-
-    # Este teste EXIGE a camada 3 (teto=1): forca USAR_FALLBACK=True e RESTAURA
-    # o valor original em finally (isolamento de estado -- o teste "cascata sem
-    # fallback" espera False e nao pode herdar True).
-    orig_fallback = config.USAR_FALLBACK
-    config.USAR_FALLBACK = True
-    orig = (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
-            cascata.fallback_celula.aplicar_fallback)
-    cascata._camada_codigo = fake_camada_codigo
-    cascata.contexto.candidatos_determinantes = fake_candidatos
-    cascata.fallback_celula.aplicar_fallback = fake_fallback
-    try:
-        correcoes, trilha = cascata.rodar_cascata(
-            "c", df, mascara_col, rotulados, mascara_completa, agentes={},
-            limite_fallback=1,
-        )
-    finally:
-        (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
-         cascata.fallback_celula.aplicar_fallback) = orig
-        config.USAR_FALLBACK = orig_fallback
-
-    cont = trilha["contagem"]
-    # rows 0,2 mudam pelo codigo; rows 1,3 escalam; fallback resolve 1 (teto=1),
-    # sobra 1 nao resolvida.
-    c.check(cont == {"codigo": 2, "fd": 0, "fallback": 1, "nao_resolvida": 1},
-            f"contagem por camada = {cont}")
-    soma = cont["codigo"] + cont["fd"] + cont["fallback"] + cont["nao_resolvida"]
-    c.check(soma == trilha["marcadas"] == 4, f"soma {soma} == marcadas {trilha['marcadas']}")
-    c.check(trilha["trilha_celula"][0] == "codigo" and trilha["trilha_celula"][1] == "fallback"
-            and trilha["trilha_celula"][3] == "nao_resolvida",
-            "trilha por celula: 0=codigo, 1=fallback, 3=nao_resolvida")
-    c.check(correcoes.get(0) == "12" and correcoes.get(1) == "" and 3 not in correcoes,
-            f"correcoes finais coerentes: {correcoes}")
-
-
 def teste_cascata_fd_passa(c: Contador):
     """Ramo camada 2 (FD) PASSA dentro de rodar_cascata -- lacuna de integracao
     que a auditoria apontou (antes so' o gate de FD era testado isolado). Camada 1
@@ -448,29 +364,25 @@ def teste_cascata_fd_passa(c: Contador):
     def fake_aplicar(fd, df_, pendentes, mascara, coluna):
         return {0: "CA", 3: "NY"}  # moda por brewery resolve as duas marcadas
 
-    def fake_fallback(*a, **k):
-        raise AssertionError("fallback nao deveria ser chamado: FD resolveu tudo")
-
     orig = (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
             cascata.fd_mod.propor_fd, cascata.fd_mod.validar_fd,
-            cascata.fd_mod.aplicar_fd, cascata.fallback_celula.aplicar_fallback)
+            cascata.fd_mod.aplicar_fd)
     (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
      cascata.fd_mod.propor_fd, cascata.fd_mod.validar_fd,
-     cascata.fd_mod.aplicar_fd, cascata.fallback_celula.aplicar_fallback) = (
+     cascata.fd_mod.aplicar_fd) = (
         fake_camada_codigo, fake_candidatos, fake_propor, fake_validar,
-        fake_aplicar, fake_fallback)
+        fake_aplicar)
     try:
         correcoes, trilha = cascata.rodar_cascata(
             "state", df, mascara_col, rotulados, mascara_completa, agentes={},
-            limite_fallback=10,
         )
     finally:
         (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
          cascata.fd_mod.propor_fd, cascata.fd_mod.validar_fd,
-         cascata.fd_mod.aplicar_fd, cascata.fallback_celula.aplicar_fallback) = orig
+         cascata.fd_mod.aplicar_fd) = orig
 
     cont = trilha["contagem"]
-    c.check(cont == {"codigo": 0, "fd": 2, "fallback": 0, "nao_resolvida": 0},
+    c.check(cont == {"codigo": 0, "fd": 2, "nao_resolvida": 0},
             f"contagem por camada = {cont}")
     c.check(trilha["gate_codigo"] is False and trilha["gate_fd"] is True,
             "gate: codigo reprovou, FD passou")
@@ -479,62 +391,6 @@ def teste_cascata_fd_passa(c: Contador):
     c.check(correcoes == {0: "CA", 3: "NY"}, f"correcoes finais = {correcoes}")
     soma = sum(cont.values())
     c.check(soma == trilha["marcadas"] == 2, f"soma {soma} == marcadas {trilha['marcadas']}")
-
-
-def teste_cascata_sem_fallback(c: Contador):
-    """USAR_FALLBACK=False (default): celula de coluna sem regra vira
-    'nao_resolvida', contagem['fallback']==0 e a camada 3 nao roda. Salva/restaura
-    USAR_FALLBACK em finally (isolamento -- outros testes forcam True)."""
-    secao("7b. Cascata SEM fallback (USAR_FALLBACK=False): pendentes viram flag")
-
-    df = pd.DataFrame({"c": ["12 oz", "20", "13 oz", "99"]})
-    mascara_completa = pd.DataFrame({"c": [1, 1, 1, 1]})
-    mascara_col = mascara_completa["c"]
-    rotulados = {
-        "rows": [
-            {"indice": 0, "sujo": "12 oz", "limpo": "12", "eh_erro": True},
-            {"indice": 1, "sujo": "20", "limpo": "20", "eh_erro": False},
-        ],
-        "itens": [], "total_linhas": 4, "total_distintos": 4,
-    }
-
-    def fake_camada_codigo(coluna, rot, agentes):
-        # funcao None -> gate reprova -> nada por codigo (3-tupla).
-        return types.SimpleNamespace(transformacao=types.SimpleNamespace(tipo="nenhuma")), None, ""
-
-    def fake_candidatos(df_, alvo, limiar=None):
-        return []  # sem determinante -> sem FD
-
-    def fake_fallback(*a, **k):
-        raise AssertionError("camada 3 nao pode rodar com USAR_FALLBACK=False")
-
-    orig_fallback = config.USAR_FALLBACK
-    config.USAR_FALLBACK = False
-    orig = (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
-            cascata.fallback_celula.aplicar_fallback)
-    cascata._camada_codigo = fake_camada_codigo
-    cascata.contexto.candidatos_determinantes = fake_candidatos
-    cascata.fallback_celula.aplicar_fallback = fake_fallback
-    try:
-        correcoes, trilha = cascata.rodar_cascata(
-            "c", df, mascara_col, rotulados, mascara_completa, agentes={},
-            limite_fallback=50,
-        )
-    finally:
-        (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
-         cascata.fallback_celula.aplicar_fallback) = orig
-        config.USAR_FALLBACK = orig_fallback
-
-    cont = trilha["contagem"]
-    c.check(cont["fallback"] == 0, f"contagem['fallback'] == 0 (camada 3 nao rodou): {cont}")
-    c.check(cont["nao_resolvida"] == trilha["marcadas"] == 4,
-            f"todas as marcadas viram nao_resolvida: {cont['nao_resolvida']} (marcadas=4)")
-    soma = sum(cont.values())
-    c.check(soma == trilha["marcadas"], f"soma por camada {soma} == marcadas {trilha['marcadas']}")
-    c.check(all(v == "nao_resolvida" for v in trilha["trilha_celula"].values()),
-            "toda celula na trilha == 'nao_resolvida'")
-    c.check(correcoes == {} and trilha["fallback_chamadas"] == 0,
-            f"nenhuma correcao e 0 chamadas de fallback: correcoes={correcoes}")
 
 
 def _gerar_e_importar(nome, detectores, plano, colunas):
@@ -1091,9 +947,7 @@ def main() -> int:
     teste_sandbox_detectar(c)
     teste_construir_mascara(c)
     teste_classificar(c)
-    teste_cascata_escalonamento(c)
     teste_cascata_fd_passa(c)
-    teste_cascata_sem_fallback(c)
     teste_gerar_limpador(c)
     teste_fd_duplo_filtro(c)
     teste_coocorrencia_codigo_fd(c)

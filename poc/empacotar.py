@@ -1,8 +1,8 @@
 """Empacota as regras geradas num limpador.py AUTONOMO e reutilizavel.
 
 O limpador NAO e' "inlinar funcoes" -- e' uma COPIA CONGELADA da logica de
-aplicacao da cascata (camadas 1 e 2, SEM a camada 3 de fallback) mais as regras
-geradas. Ele reproduz a semantica exata do run que o gerou:
+aplicacao da cascata (camadas 1 e 2: codigo e FD) mais as regras geradas. Ele
+reproduz a semantica exata do run que o gerou:
 
   - a mascara e' construida sobre o df ORIGINAL, por coluna, POSICIONALMENTE
     (espelho de deteccao.construir_mascara);

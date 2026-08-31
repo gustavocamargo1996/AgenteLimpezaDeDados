@@ -36,19 +36,6 @@ MAX_REPRESENTANTES = 12
 # --- Geracao de codigo ---
 MAX_TENTATIVAS_CODIGO = 3
 
-# --- Modo end-to-end (--e2e) ---
-# Liga/desliga a camada 3 da cascata (fallback por celula via LLM). DEFAULT
-# False: medido em 7 runs que o fallback resolve ~100% das correcoes de
-# ounces/abv mas com acerto ~0-0.5% -- custa milhares de chamadas para ~0 de
-# correcao util, e e' a unica camada sem gate. Desligado, as celulas que
-# codigo/FD nao cobrem ficam FLAGADAS (trilha 'nao_resolvida', contagem
-# fallback==0). Ligue (True) so' para comparacao com o comportamento antigo.
-USAR_FALLBACK = False
-# Teto de chamadas de LLM na camada 3 (fallback por celula), contadas por VALOR
-# distinto enviado, por coluna. Ao atingir, as celulas restantes ficam sujas e
-# sao logadas -- o custo nao escapa. So' tem efeito quando USAR_FALLBACK=True.
-LIMITE_FALLBACK = 50
-
 # --- Loop de refinamento da deteccao (--e2e --iteracoes-deteccao N) ---
 # Default 1 = deteccao de 1 passe (comportamento atual, SEM loop). N>1 ativa o
 # active learning com oraculo (clean) que refina `detectar(valor)` iteracao a
@@ -72,7 +59,7 @@ LIMITE_PRECISAO_DETECCAO = 0.8
 # opcional.
 BONUS_ARTEFATO_X = True
 # Corte da MI normalizada (divide-by-max) para eleger colunas candidatas a
-# determinante na FD e a contexto no fallback. Replica o uso do ZeroDC.
+# determinante na FD. Replica o uso do ZeroDC.
 MI_THRESHOLD = 0.5
 
 # --- Dados ---

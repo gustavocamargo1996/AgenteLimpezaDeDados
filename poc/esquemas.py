@@ -128,17 +128,3 @@ class DependenciaFuncional(BaseModel):
     justificativa: str = Field(
         description="Por que uma coluna determina a outra, citando o padrao observado."
     )
-
-
-class CorrecaoCelula(BaseModel):
-    """Ultima camada: correcao de UM valor distinto pelo LLM.
-
-    `valor` PODE vir vazio quando nao ha correcao confiavel -- e proibido forcar
-    'null' ou inventar um valor plausivel so' para nao deixar vazio.
-    """
-
-    cadeia: str = Field(description="O raciocinio que leva ao valor corrigido.")
-    valor: str = Field(
-        description="O valor corrigido. Deixe vazio ('') se nao houver correcao "
-        "confiavel; NUNCA invente um valor nem escreva 'null'."
-    )
