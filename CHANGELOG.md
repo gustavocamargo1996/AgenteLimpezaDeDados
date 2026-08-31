@@ -3,13 +3,93 @@
 Mudanças relevantes desta POC. Formato baseado em
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
-Nada foi publicado. `0.1.0` é o que `poc/__init__.py` declara em `__version__`; não há
-tag, release nem pacote distribuído. Não existe histórico de versionamento neste
-diretório — as entradas abaixo referenciam arquivo e função, não commit.
+Nada foi publicado. `0.1.0` é o que `limpeza/__init__.py` declara em `__version__`; não
+há tag, release nem pacote distribuído. As entradas abaixo referenciam arquivo e
+função, não commit.
+
+## [Não publicado]
+
+Simplificação do gerador de limpadores (30/ago/2026). O objetivo declarado era
+reduzir a superfície do código sem mover um único número publicado — e o
+invariante de `tests/test_invariante.py` (495 erros, 121 mudanças, 121 TP,
+precisão 1,0, recall 0,2444, F1 0,3929, 71 flags no `beers` de 300 linhas)
+continua idêntico ao do início.
+
+### Removido
+
+- **Modo `blind` e a comparação entre modos.** O `main.py` deixou de ter
+  `--modo`: o único regime é o de orçamento de rotulagem. O `comparativo.md`
+  e a máquina que o produzia saíram junto.
+- **Camada 3 da cascata** (fallback por célula via LLM): módulo
+  `fallback_celula.py`, a flag `USAR_FALLBACK`, o argumento
+  `--limite-fallback` e a chave `contagem["fallback"]`. Medição de 7 execuções
+  mostrou ~0–0,5% de acerto ao custo de milhares de chamadas de LLM, e era a
+  única camada sem gate de 100%. Nunca participou de nenhum número publicado.
+  Ver `docs/DECISOES.md#veredito-contra-o-fallback`.
+- **Acoplamento ao `ZERODC_DIR`.** A entrada passou a ser caminho de arquivo
+  (`--sujo`/`--limpo`); a variável de ambiente e a resolução de dataset por
+  nome de pasta deixaram de existir.
+- **Módulos de consumidor único**, fundidos nos seus chamadores:
+  `embeddings.py` (para `amostragem.py`), `avaliacao.py` (para `metricas.py`),
+  `identificador_regras.py` e `gerador_codigo.py` (para `correcao/regras.py`).
+- **`verificar_ambiente.py` e `verificar_e2e.py`**, convertidos na suíte
+  `pytest` de `tests/`.
+
+### Alterado
+
+- **`poc/` virou `limpeza/`**, com os subpacotes `deteccao/` (`regra`,
+  `oraculo`, `refino`, `mascara`) e `correcao/` (`cascata`, `regras`, `fd`). O
+  `deteccao.py` de 776 linhas virou quatro módulos; nenhum arquivo do pacote
+  passa de **297 linhas** (era 1.118 o maior).
+- **Espinha explícita em `limpeza/pipeline.py::gerar_limpador`**: as etapas do
+  gerador, em ordem, num só lugar. `main.py` ficou só com CLI e impressão.
+- **Tipos nomeados em `limpeza/tipos.py`** (`Coluna`, `Tabela`, `Amostra`,
+  `Detector`, `Correcao`, `Trabalho`) no lugar dos dicionários que viajavam
+  entre as etapas. `Detector` guarda `codigo`/`funcao` **sem** interpretar a
+  assinatura, para não espalhar a premissa intra-coluna.
+- **Loop de refinamento da detecção com oráculo virou o default**
+  (`ITERACOES_DETECCAO = 5`), em vez de um modo opcional: é ele que produz os
+  números publicados.
+- **Resiliência concentrada numa fronteira só**, `pipeline.py::_processar_coluna`.
+  Exceções caíram de **22 para 16** e loops de **68 para 40**; cada `except`
+  restante tem um comportamento de degradação nomeado.
+- **Comentários podados**: mecânica no código, porquê em `docs/DECISOES.md`.
+  O pacote saiu de **4.969 para 2.497 linhas** e a densidade de comentário de
+  **23,7% para 11,1%** (medido por `tests/medir_verbosidade.py`). Docstrings
+  de 1 linha, comentário inline com teto de 2.
+- **Suíte de testes de 1 para 87.** Inclui o invariante do limpador congelado,
+  a trava byte a byte de `empacotar._ESTATICO` contra a fixture
+  (`tests/test_estatico_congelado.py`) e um alarme do modelo ONNX real que
+  pula quando o modelo não está no disco.
+- **Documentação reescrita**: `CLAUDE.md` novo (arquitetura, tipos,
+  invariante, políticas, costura cross-column, zonas de risco); `README.md`
+  reescrito para a CLI atual; `docs/DECISOES.md` com todas as referências de
+  **Onde** apontando para símbolos que existem.
 
 ## [0.1.0] — não publicado
 
 Construção da POC (22–23/jul/2026).
+
+> **Leia como história, não como mapa.** As entradas abaixo descrevem o código
+> como ele era em julho de 2026 e ficam preservadas de propósito. Os caminhos
+> `poc/...` não existem mais: o pacote é `limpeza/`. Tradução dos módulos
+> citados aqui para os de hoje:
+>
+> | Citado abaixo | Hoje |
+> |---|---|
+> | `poc/dados.py` | `limpeza/dados.py` |
+> | `poc/amostragem.py`, `poc/embeddings.py` | `limpeza/amostragem.py` |
+> | `poc/identificador_regras.py`, `poc/gerador_codigo.py` | `limpeza/correcao/regras.py` |
+> | `poc/avaliacao.py` | `limpeza/metricas.py` |
+> | `poc/sandbox.py`, `poc/esquemas.py`, `poc/relatorio.py`, `poc/config.py` | mesmo nome em `limpeza/` |
+>
+> Além do rename, estas coisas **não existem mais** (ver `[Não publicado]`):
+> os modos `blind`/`budget` e o `comparativo.md`; `main.py --reavaliar`;
+> `main.py:_preparar_itens` (a lógica de ambiguidade vive em
+> `limpeza/correcao/cascata.py::_itens`); `dados.particionar` e as duas escalas
+> de holdout `generalizacao`/`cobertura`, substituídas pelo F1 de reparo de
+> `avaliar_limpador.py`; e a seção "Variância entre execuções" do README, cujo
+> conteúdo está integralmente reproduzido em **Documented**, logo abaixo.
 
 ### Added
 
@@ -47,14 +127,15 @@ Construção da POC (22–23/jul/2026).
 
 ### Documented
 
-- **Variância entre execuções** (README, seção "Variância entre execuções"). Duas
+- **Variância entre execuções** (então na seção homônima do README; hoje esta
+  entrada é o único registro). Duas
   execuções de 23/07 com entrada idêntica — mesmo dataset, modelo, prompt e os mesmos
   representantes (KMeans `random_state=0`) — divergiram: `city` no modo `budget` fez
   100% às 11h33 e 11,3% às 17h11, e `state` no `blind` alternou entre `erro=sim` e
   `erro=NAO`. `abv`, `ibu` e `ounces` repetiram. `temperature=0` não garante
   determinismo. Causa do caso `city` legível no código gerado: numa execução o agente
   generalizou o sufixo (`\s+[A-Z]{2}`, cobre 127/127), na outra decorou os dois
-  exemplos vistos (`PA|IN`, cobre 17/127). Consequência registrada no README: os
+  exemplos vistos (`PA|IN`, cobre 17/127). Consequência então registrada no README: os
   números publicados são de **uma execução**, não propriedades do método; medir faixa
   exigiria k repetições, que esta POC não implementa.
 

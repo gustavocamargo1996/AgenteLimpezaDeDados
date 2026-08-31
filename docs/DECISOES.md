@@ -5,9 +5,10 @@ gate sobreviva à poda de comentários (Task 9 do refactor). Cada entrada é
 curta de propósito: o raciocínio longo mora aqui, o código só precisa de um
 comentário de mecânica e um link para a entrada correspondente.
 
-Os caminhos em **Onde** são os do pacote reestruturado (`limpeza/...`), não os
-do `poc/...` atual — este documento é escrito para sobreviver ao rename da
-Task 6.
+O refactor terminou: o pacote é `limpeza/`, e todo caminho citado em **Onde**
+aponta para um símbolo que existe hoje. Se um deles deixar de existir, corrigir
+esta referência faz parte da tarefa que o removeu — não é dívida para depois.
+Para a arquitetura e as políticas em vigor, ver `CLAUDE.md`.
 
 <a id="carga-literal"></a>
 ## Carga literal
@@ -21,8 +22,8 @@ dataset beers isso funde a sentinela do dirty com o vazio do clean — os dois
 viram o mesmo token — e apaga 1.005 erros reais (42% da coluna) antes de
 qualquer algoritmo rodar.
 
-**Onde:** `limpeza/dados.py::carregar` (hoje `poc/dados.py:37-57`, comentário
-"DESVIO DELIBERADO DO ZERODC" nas linhas 40-48).
+**Onde:** `limpeza/dados.py::carregar` — o dicionário `ler` e o comentário
+`keep_default_na=False` logo acima dele.
 
 <a id="kmeans-sobre-distintos"></a>
 ## KMeans sobre distintos
@@ -36,9 +37,9 @@ embedar célula a célula (como o ZeroDC faz) multiplicaria o custo de
 embedding por ~96x sem acrescentar sinal novo, porque a maioria das células é
 repetição do mesmo valor sujo.
 
-**Onde:** `limpeza/config.py` (`N_CLUSTERS=6`, `MAX_REPRESENTANTES=12`; hoje
-`poc/config.py:29-34`) e `limpeza/amostragem.py::selecionar` (hoje
-`poc/amostragem.py:17-46`).
+**Onde:** `limpeza/config.py` (`N_CLUSTERS=6`, `MAX_REPRESENTANTES=12`) e
+`limpeza/amostragem.py::selecionar`, chamado por
+`limpeza/amostragem.py::representantes` sobre `coluna.valores_distintos`.
 
 <a id="representantes-tipico-e-atipico"></a>
 ## Representantes típico e atípico
@@ -56,14 +57,14 @@ cumpre a função quando o cluster mistura sujo e limpo; o caso `ounces` mostra
 onde essa premissa quebra: as mesmas 2.410 células que colapsam em 25 valores
 distintos (ver "KMeans sobre distintos") estão 100% corrompidas, então a
 forma corrompida vira a própria norma do cluster — não sobra um "típico
-limpo" para o atípico contrastar, e a detecção correspondente dá F1=0
-(`poc/deteccao.py:163-166`, ver "Ponto cego da corrupção universal"). É essa
-mesma falha que `N_CLUSTERS=6`/`MAX_REPRESENTANTES=12` sozinhos não resolvem,
-e que motiva o loop de refinamento com oráculo.
+limpo" para o atípico contrastar, e a detecção de 1 passe dá F1=0 (ver
+"Ponto cego da corrupção universal"). É essa mesma falha que
+`N_CLUSTERS=6`/`MAX_REPRESENTANTES=12` sozinhos não resolvem, e que motiva o
+loop de refinamento com oráculo.
 
-**Onde:** `limpeza/amostragem.py::selecionar` (hoje `poc/amostragem.py:31-39`,
-comentários `# mais atipico` / `# mais tipico`, e `poc/amostragem.py:1-10`
-para o limite estrutural declarado no docstring de módulo).
+**Onde:** `limpeza/amostragem.py::selecionar`, comentários `# mais atipico` /
+`# mais tipico`; o limite estrutural está declarado no comentário de módulo de
+`limpeza/amostragem.py`, logo abaixo do docstring.
 
 <a id="portao-ast"></a>
 ## Portão AST
@@ -80,8 +81,9 @@ nome do módulo hospedeiro. Aqui o namespace do exec é sempre
 `{re, __builtins__}` descartável, criado por chamada — o código gerado não
 tem como alcançar nada fora dele.
 
-**Onde:** `limpeza/sandbox.py::validar`/`materializar` (hoje
-`poc/sandbox.py:1-27` para a justificativa, `65-155` para a implementação).
+**Onde:** `limpeza/sandbox.py` — `_CHAMADAS_PROIBIDAS` e
+`_BUILTINS_PERMITIDOS` para as listas, `validar` para o portão e
+`materializar` para o namespace descartável do `exec`.
 
 <a id="modo-serie"></a>
 ## Modo série
@@ -97,14 +99,14 @@ contrato intra-coluna). `pd` também fica fora do namespace do exec nos dois
 modos, então `pd.read_csv`/`pd.eval` dão `NameError` mesmo antes da allowlist
 agir — duas barreiras independentes para o mesmo risco.
 
-**Onde:** `limpeza/sandbox.py` (hoje `poc/sandbox.py:10-26` para a
-justificativa, `51-62` para a allowlist, `117-124` para o gate).
+**Onde:** `limpeza/sandbox.py` — `_ATRIBUTOS_SERIE` para a allowlist (17
+nomes) e o ramo `series_mode` de `validar` para o gate.
 
 <a id="orcamento-vs-gabarito"></a>
 ## Orçamento vs. gabarito
 
 **Decisão:** o CSV `--limpo` alimenta 3 papéis distintos e não intercambiáveis
-— orçamento de rotulagem (`dados.montar_rotulados`, ~10 valores por coluna),
+— orçamento de rotulagem (`amostragem._rotular`, ~10 valores por coluna),
 gates da cascata (100% nos rótulos mostrados) e gabarito da métrica final —
 e só o terceiro exige a tabela `clean` completa.
 
@@ -116,9 +118,14 @@ correspondem a 38 estados-limpo distintos; reduzir esse mapeamento a uma moda
 única ("vazio → CO") ensinaria ao agente uma regra falsa, e ele produziria,
 com toda a lógica do mundo, um corretor que escreve "CO" em toda célula vazia.
 
-**Onde:** `limpeza/dados.py::montar_rotulados` (hoje `poc/dados.py:66-88`);
-exemplo da ambiguidade em `main.py:52-60` (hoje `_preparar_itens`); os 3
-papéis também estão descritos em
+**Onde:** `limpeza/amostragem.py::_rotular` (chamado por `representantes`,
+monta os pares `sujo`/`limpo`/`eh_erro` das linhas exibidas); o tratamento da
+ambiguidade em `limpeza/correcao/cascata.py::_itens` (`ambiguo`,
+`limpos_distintos`, `exemplos_limpos`); os gates em
+`limpeza/correcao/cascata.py::_gate_codigo` e
+`limpeza/correcao/fd.py::validar_fd`; o gabarito da métrica em
+`limpeza/metricas.py::avaliar`. Os 3 papéis também estão descritos em
+`CLAUDE.md`, seção 1, e em
 `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`, seção 3,
 Decisão 4.
 
@@ -136,10 +143,10 @@ estragar células que já estavam corretas, a cascata prefere não aplicar nada
 e deixar a célula escalar para a próxima camada (ver "Escalonamento célula a
 célula").
 
-**Onde:** `limpeza/correcao/cascata.py::_gate_codigo` (hoje
-`poc/cascata.py:24-36`) e `limpeza/correcao/fd.py::validar_fd` (hoje
-`poc/fd.py:8,113-...`, comentário de módulo "exige 100% no conjunto
-rotulado").
+**Onde:** `limpeza/correcao/cascata.py::_gate_codigo` (camada 1) e
+`limpeza/correcao/fd.py::validar_fd` (camada 2). O resultado de cada um vira
+`gate_codigo`/`gate_fd` na trilha, e só um gate aprovado deixa a camada
+escrever em `correcoes`.
 
 <a id="flag-em-vez-de-chute"></a>
 ## Flag em vez de chute
@@ -148,49 +155,56 @@ rotulado").
 recebe `trilha_celula[idx] = "nao_resolvida"`; a cascata nunca escreve um
 valor inventado numa célula que não conseguiu tratar.
 
-**Por quê:** com `USAR_FALLBACK=False` (default), a contagem `fallback` fica
-sempre 0 e a invariante contábil da cascata —
-`contagem[codigo] + contagem[fd] + contagem[fallback] + contagem[nao_resolvida]
+**Por quê:** a invariante contábil da cascata —
+`contagem["codigo"] + contagem["fd"] + contagem["nao_resolvida"]
 == células marcadas` — só fecha porque a flag absorve exatamente o resto.
-Sinalizar substitui chutar.
+Sinalizar substitui chutar. (A chave `fallback` existia enquanto havia uma
+camada 3; ela saiu junto com a camada — ver "Veredito contra o fallback".)
 
-**Onde:** `limpeza/correcao/cascata.py::rodar_cascata` (hoje
-`poc/cascata.py:75-165`, invariante contábil documentada nas linhas 17-19).
+**Onde:** `limpeza/correcao/cascata.py::rodar_coluna` — a inicialização de
+`trilha_celula` com `"nao_resolvida"`, o dicionário `contagem` com as três
+chaves, e `contagem["nao_resolvida"] = len(pendentes)` no fim.
+`_trilha_de_falha` mantém a mesma contabilidade quando a coluna inteira falha.
 
 <a id="veredito-contra-o-fallback"></a>
 ## Veredito contra o fallback
 
-**Decisão:** a camada 3 da cascata (fallback por célula via LLM) fica
-desligada por default (`USAR_FALLBACK=False`) e sai inteiramente do pacote
-reestruturado — módulo, camada e flag `--limite-fallback`.
+**Decisão:** a camada 3 da cascata (fallback por célula via LLM) saiu
+inteiramente do pacote — módulo, camada, flag de configuração e argumento de
+CLI. Já vinha desligada por default; agora não existe.
 
 **Por quê:** medição de 7 execuções mostrou que o fallback resolve ~100% das
 correções pendentes de `ounces`/`abv` mas com acerto de apenas ~0–0,5%, ao
-custo de milhares de chamadas de LLM — e é a única camada da cascata sem gate
-de 100%. O fallback não participou de nenhum número publicado da POC.
+custo de milhares de chamadas de LLM — e era a única camada da cascata sem
+gate de 100%. O fallback não participou de nenhum número publicado da POC.
+Não reintroduza sem uma medição nova que contrarie essa.
 
-**Onde:** hoje `poc/config.py:39-50` (comentário do `USAR_FALLBACK`) e
-`poc/fallback_celula.py` — ambos removidos no refactor (ver
+**Onde:** em lugar nenhum do código — é o ponto da decisão. O módulo
+`fallback_celula.py`, a flag `USAR_FALLBACK`, o argumento `--limite-fallback`
+e a chave `contagem["fallback"]` foram removidos;
+`limpeza/correcao/cascata.py::rodar_coluna` tem exatamente duas camadas mais a
+flag. Registro da remoção no `CHANGELOG.md`
+(`[Não publicado]`, Removido) e o racional em
 `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`, seção 3,
-Decisão 3, e seção 8 "Fora de escopo").
+Decisão 3, e seção 8 "Fora de escopo".
 
 <a id="loop-de-refinamento-com-oraculo"></a>
 ## Loop de refinamento com oráculo
 
-**Decisão:** o loop de active learning com oráculo (hoje `--e2e
---iteracoes-deteccao N>1`) fica e vira comportamento default, com orçamento de
-`AMOSTRAS_POR_ITERACAO=2` valores distintos rotulados por iteração (metade
-previsto-sujo, metade previsto-limpo).
+**Decisão:** o loop de active learning com oráculo fica e vira comportamento
+default (`ITERACOES_DETECCAO=5`; `--iteracoes-deteccao 1` ainda desliga o
+loop e volta ao 1-passe), com orçamento de `AMOSTRAS_POR_ITERACAO=2` valores
+distintos rotulados por iteração (metade previsto-sujo, metade
+previsto-limpo).
 
 **Por quê:** é este loop — e não a detecção de 1 passe — que produz os
 números publicados da POC (Decisão 2 do design doc). Sem ele, a detecção fica
 presa ao 1-passe, que é cego à corrupção universal (ver próxima entrada).
 
-**Onde:** `limpeza/config.py` (`ITERACOES_DETECCAO`, `AMOSTRAS_POR_ITERACAO`;
-hoje `poc/config.py:52-59`) e `limpeza/deteccao/refino.py` (hoje
-`poc/deteccao.py::refinar_regra_deteccao`, linhas 570-722 — é o maior bloco
-do módulo: 562 das 776 linhas de `poc/deteccao.py` pertencem ao loop de
-refino).
+**Onde:** `limpeza/config.py` (`ITERACOES_DETECCAO`, `AMOSTRAS_POR_ITERACAO`,
+`LIMITE_PRECISAO_DETECCAO`), `limpeza/deteccao/refino.py::refinar_regra_deteccao`
+(o loop) e `limpeza/deteccao/oraculo.py` (a escolha do que rotular a cada
+iteração). O acionamento está em `limpeza/pipeline.py::_processar_coluna`.
 
 <a id="ponto-cego-da-corrupcao-universal"></a>
 ## Ponto cego da corrupção universal
@@ -200,15 +214,19 @@ refino).
 corrompidas, a forma corrompida vira a norma estatística da coluna, e nem o
 KMeans nem a detecção de 1 passe encontram um "atípico" para apontar o erro.
 
-**Por quê:** `poc/deteccao.py:163-166` documenta que `ounces`/`abv`/`city` dão
-F1=0 no 1-passe exatamente por esse motivo. A causa mecânica está em
-`poc/config.py:30-32` e no docstring de `poc/amostragem.py:1-10`: as 2.410
-células de `ounces` colapsam em 25 valores, todos na mesma forma corrompida —
-não existe cluster "limpo" para o atípico contrastar contra.
+**Por quê:** `ounces`/`abv`/`city` dão F1=0 no 1-passe exatamente por esse
+motivo. A causa mecânica: as 2.410 células de `ounces` colapsam em 25 valores,
+todos na mesma forma corrompida — não existe cluster "limpo" para o atípico
+contrastar contra. É o que o loop de refino com oráculo compensa, comprando
+rótulos em vez de confiar na estatística da coluna.
 
-**Onde:** `limpeza/amostragem.py` (docstring de módulo, hoje
-`poc/amostragem.py:1-10`) e `limpeza/deteccao/refino.py` (hoje
-`poc/deteccao.py:163-166`).
+**Onde:** o limite está anotado no comentário de módulo de
+`limpeza/amostragem.py`; a compensação, no comentário do prompt
+`SISTEMA_UPDATE` de `limpeza/deteccao/refino.py` ("aqui e' onde o 1-passe
+falha quando a corrupcao e' a norma"). O caso `ounces` está exercitado em
+`tests/test_refino.py::test_ounces_like_regra_ampla_nao_punida_quando_todos_os_rotulos_sao_erro`:
+com todos os rótulos sendo erro, uma regra que marca tudo tem precisão 1,0 e a
+guarda não tem como puni-la — a cegueira é declarada, não acidental.
 
 <a id="deteccao-intra-coluna"></a>
 ## Detecção intra-coluna
@@ -225,17 +243,23 @@ lugares, o próximo projeto (trocar `detectar(col)` por uma forma cross-column)
 tem que redescobrir o contrato em vez de trocá-lo num lugar só. A tabela
 abaixo é a mesma da seção 9 do design doc:
 
-| # | Onde (hoje → futuro) | O quê | Já preparado para a troca? |
+| # | Onde | O quê | Já preparado para a troca? |
 |---|---|---|---|
-| 1 | `poc/sandbox.py::validar` → `limpeza/sandbox.py::validar` | `nome_funcao`/`nome_argumento` parametrizados | **sim** |
-| 2 | `poc/sandbox.py::_ATRIBUTOS_SERIE` → `limpeza/sandbox.py` | allowlist que bloqueia cross-row e travessia de `pd` | não |
-| 3 | `poc/sandbox.py::materializar` → `limpeza/sandbox.py` | `pd` fora do namespace do exec | não |
-| 4 | `poc/deteccao.py` (prompt, 4 ocorrências) → `limpeza/deteccao/regra.py` | o prompt declara `detectar(col)` | não |
-| 5 | `poc/deteccao.py::DETECTA_NADA` → `limpeza/deteccao/regra.py` | sentinela `"def detectar(col): ..."` | não |
-| 6 | `poc/deteccao.py::construir_mascara` → `limpeza/deteccao/mascara.py` | aplica `detectar(col)` uma vez por coluna, posicional | não |
-| 7 | `poc/empacotar.py` → `limpeza/empacotar.py` | cópia congelada da mesma aplicação, no limpador gerado | não |
+| 1 | `limpeza/sandbox.py::validar` | `nome_funcao`/`nome_argumento` parametrizados | **sim** |
+| 2 | `limpeza/sandbox.py::_ATRIBUTOS_SERIE` | allowlist que bloqueia cross-row e travessia de `pd` | não |
+| 3 | `limpeza/sandbox.py::materializar` | `pd` fora do namespace do exec | não |
+| 4 | `limpeza/deteccao/regra.py` (prompt, 4 ocorrências) | o prompt declara `detectar(col)` | não |
+| 5 | `limpeza/deteccao/regra.py::DETECTA_NADA` | sentinela `"def detectar(col): ..."` | não |
+| 6 | `limpeza/deteccao/mascara.py::aplicar_detectores` | aplica `detectar(col)` uma vez por coluna, posicional | não |
+| 7 | `limpeza/empacotar.py::_ESTATICO` | cópia congelada da mesma aplicação, no limpador gerado | não |
 
-**Onde:** ver tabela acima; lista original em
+O tipo `Detector` (`limpeza/tipos.py`) guarda `codigo` e `funcao` **sem
+inspecionar a assinatura**, de propósito: é o que impede um oitavo ponto de
+aparecer. A máscara é consumida como `DataFrame[bool]` pelas etapas de
+correção, métrica e empacotamento, que não sabem como ela foi construída.
+
+**Onde:** ver tabela acima; a mesma lista está reproduzida em `CLAUDE.md`,
+seção 7, e a original em
 `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`, seção 9.
 
 <a id="escalonamento-celula-a-celula"></a>
@@ -251,9 +275,9 @@ ZeroDC, onde `mask = dirty != corrections` zera a detecção das células que
 mudaram de valor. Sem essa regra, uma camada que roda sem alterar nada
 esconderia células que continuam erradas, como se tivessem sido tratadas.
 
-**Onde:** `limpeza/correcao/cascata.py` (docstring de módulo, hoje
-`poc/cascata.py:6-19`; aplicação nos comentários `# intacta escala` das
-linhas 104 e 123).
+**Onde:** `limpeza/correcao/cascata.py::rodar_coluna` — os dois comentários
+`# intacta escala`, um na camada de código e um na de FD, cada um alimentando
+a lista `restantes` que vira `pendentes` da camada seguinte.
 
 <a id="random-state-0"></a>
 ## random_state=0
@@ -266,8 +290,8 @@ reproduz exatamente os mesmos representantes de uma execução anterior. É o
 que permite recalcular métricas (holdout, F1) sobre uma run já feita sem
 chamar o LLM de novo — reavaliar custa zero de API.
 
-**Onde:** `limpeza/amostragem.py::selecionar` (hoje `poc/amostragem.py:29`);
-motivo explicado no docstring de `main.py::_selecionar_representantes` (hoje
-`main.py:35-41`), que hoje chama `amostragem.selecionar` a partir do `main.py`
-e migra para dentro de `limpeza/amostragem.py` na etapa (2) do pipeline (ver
-design doc, seção 5, "A espinha").
+**Onde:** `limpeza/amostragem.py::selecionar`, na chamada
+`KMeans(n_clusters=k, random_state=0, n_init=10)`. A seleção é acionada por
+`limpeza/amostragem.py::representantes`, chamado pela etapa 2 do pipeline
+(`limpeza/pipeline.py::_processar_coluna`) — não há mais nenhuma amostragem
+disparada do `main.py`.
