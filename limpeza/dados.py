@@ -8,11 +8,10 @@ from .tipos import Coluna, Tabela
 
 
 class DadosInvalidos(ValueError):
-    """Dataset que nao da' para processar: caminho, colunas ou linhas desalinhadas."""
+    pass
 
 
 def nome_dataset(caminho) -> str:
-    """Deriva o nome do dataset do stem do CSV sujo, sem o marcador _dirty/_sujo."""
     stem = Path(caminho).stem
     return re.sub(r"_(dirty|sujo)(?=_|$)", "", stem, flags=re.IGNORECASE)
 
@@ -23,8 +22,8 @@ def carregar(caminho_sujo, caminho_limpo, colunas=None) -> Tabela:
         if not Path(caminho).exists():
             raise DadosInvalidos(f"arquivo {rotulo} nao encontrado: {caminho}")
 
-    # keep_default_na=False mantem "N/A", "NA", "null", "-" como o texto que sao:
-    # sentinela de ausencia vira algo que o agente pode detectar.
+    # keep_default_na=False: sem isso o pandas converte "N/A" em NaN e apaga
+    # 1.005 erros reais de `ibu`. Ver docs/DECISOES.md#carga-literal.
     ler = dict(dtype=str, keep_default_na=False, na_values=[])
     sujo = pd.read_csv(caminho_sujo, **ler)
     limpo = pd.read_csv(caminho_limpo, **ler)
@@ -34,8 +33,7 @@ def carregar(caminho_sujo, caminho_limpo, colunas=None) -> Tabela:
         raise DadosInvalidos(
             f"dirty tem {len(sujo)} linhas e clean tem {len(limpo)}")
 
-    # Lista vazia e' um pedido explicito de nenhuma coluna; so' None quer dizer
-    # "todas as colunas do dataset".
+    # Lista vazia = nenhuma coluna; so' None quer dizer "todas".
     nomes = (list(colunas) if colunas is not None
              else [c for c in sujo.columns if c.lower() != "index"])
     faltando = [n for n in nomes if n not in sujo.columns]
@@ -46,7 +44,6 @@ def carregar(caminho_sujo, caminho_limpo, colunas=None) -> Tabela:
 
 
 def montar_coluna(sujo: pd.DataFrame, limpo: pd.DataFrame, nome: str) -> Coluna:
-    """Monta a Coluna com os valores distintos ordenados e a contagem por valor."""
     serie = sujo[nome]
     return Coluna(
         nome=nome,

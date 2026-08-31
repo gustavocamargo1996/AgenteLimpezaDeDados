@@ -1,28 +1,11 @@
-"""Os dois agentes da camada 1: o especificador (JSON) e o tradutor (codigo).
-
-AGENTE 1 -- especificador: recebe os representantes escolhidos pelo KMeans e
-devolve, numa unica chamada, a cadeia de pensamento E o JSON da regra. Os dois
-nascem juntos de proposito: a cadeia e' o caminho ate a spec, nao uma
-justificativa escrita depois. Ve os pares sujo->limpo das representantes
-(orcamento de rotulagem do ZeroDC) e reconstroi o caminho ate a resposta, que
-e' o mecanismo do Auto-CoT original.
-
-AGENTE 2 -- tradutor: recebe o JSON do especificador e devolve codigo Python.
-Nao ve os dados, nao ve a amostra, nao reinterpreta o problema: traduz a spec.
-Se o codigo sair errado, o defeito e' de traducao -- e essa separacao e'
-justamente o que permite saber onde o pipeline quebrou. O codigo passa pelo
-portao AST antes de existir como funcao; rejeicao volta para o LLM como
-feedback, ate MAX_TENTATIVAS_CODIGO.
-"""
+"""Etapa 4, camada 1: agente especificador (JSON) e agente tradutor (codigo) da correcao."""
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
 from .. import config, sandbox
 from ..esquemas import CodigoGerado, RegraCorrecao
 
-# --------------------------------------------------------------------------- #
-# Agente 1: especificador
-# --------------------------------------------------------------------------- #
+# --- Agente 1: especificador ---
 
 SISTEMA_ESPECIFICADOR = """Voce especifica regras de correcao para colunas de tabelas sujas.
 
@@ -120,9 +103,7 @@ def especificar(
     return regra
 
 
-# --------------------------------------------------------------------------- #
-# Agente 2: tradutor
-# --------------------------------------------------------------------------- #
+# --- Agente 2: tradutor ---
 
 IDENTIDADE = '''def corrigir(valor):
     """Regra 'nenhuma': nada a corrigir localmente. Devolve o valor intacto."""
@@ -180,12 +161,7 @@ def construir_agente_codigo(modelo: str | None = None):
 
 
 def traduzir(regra: RegraCorrecao, agente=None) -> dict:
-    """Devolve {codigo, nota, funcao, tentativas, rejeicoes}.
-
-    `funcao` vem None se o codigo foi rejeitado ate o fim -- e nesse caso a
-    coluna e' reportada como falha de traducao, sem fallback silencioso. Um
-    fallback deterministico aqui esconderia exatamente o dado que interessa.
-    """
+    """Traduz a spec em codigo Python; tenta ate MAX_TENTATIVAS_CODIGO vezes se o portao rejeitar."""
     if regra.transformacao.tipo == "nenhuma" or not regra.erro_detectado:
         return {
             "codigo": IDENTIDADE,
@@ -210,8 +186,7 @@ def traduzir(regra: RegraCorrecao, agente=None) -> dict:
         ultimo_codigo = resposta.codigo.strip()
         try:
             funcao = sandbox.materializar(ultimo_codigo)
-            # Amostras vindas da propria spec: se a regra nao sobrevive aos exemplos
-            # que a justificaram, nao ha por que solta-la sobre a coluna inteira.
+            # Testa com os proprios exemplos da spec: se falha neles, nao vale soltar na coluna.
             amostras = [e.de for e in regra.exemplos] or ["12.0 oz", "", "null"]
             sandbox.testar_fumaca(funcao, amostras)
         except sandbox.CodigoRejeitado as erro:
@@ -229,7 +204,7 @@ def traduzir(regra: RegraCorrecao, agente=None) -> dict:
     return {
         "codigo": ultimo_codigo,
         "nota": "TRADUCAO FALHOU: codigo rejeitado pelo validador em todas as tentativas.",
-        "funcao": None,
+        "funcao": None,  # sem fallback: reporta a falha em vez de esconder o dado
         "tentativas": config.MAX_TENTATIVAS_CODIGO,
         "rejeicoes": rejeicoes,
     }

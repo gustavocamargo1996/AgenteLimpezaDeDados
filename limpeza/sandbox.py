@@ -1,36 +1,11 @@
-"""Portao AST + execucao restrita do codigo gerado pelo LLM.
-
-Adaptado de detection.py:125-161 do ZeroDC, com dois endurecimentos que o
-original nao tem:
-  1. NAO executa em globals() -- o correction.py:790 do ZeroDC faz
-     exec(code, globals()), o que permite ao codigo gerado redefinir qualquer
-     nome do modulo. Aqui o namespace e' descartavel.
-  2. builtins entram por allowlist explicita, em vez de virem inteiros.
-
-MODO SERIE (series_mode, ADITIVO -- usado so' pela deteccao `detectar(col)`):
-a deteccao passou a receber a COLUNA inteira (uma pd.Series) e devolver uma
-pd.Series[bool]. Nesse modo o portao ganha uma ALLOWLIST DE ATRIBUTOS
-(`_ATRIBUTOS_SERIE`): todo `ast.Attribute` do corpo deve ter `.attr` num conjunto
-pequeno e fechado (o idioma-alvo: str.contains e comparacoes elementwise).
-Qualquer atributo fora disso REJEITA -- isso bloqueia I/O (`to_csv`/`to_pickle`) e
-operacoes cross-row (`duplicated`/`mode`/`groupby`/`shift`/`values`/`to_numpy`/
-`apply`/`pipe`). `pd` NAO entra no namespace do exec (segue `{re, __builtins__}`),
-entao `pd.read_csv`/`pd.io.common.get_handle`/`pd.eval` ficam inalcancaveis
-(NameError) alem de ja serem barrados pela allowlist. O modo escalar (default,
-series_mode=False) e' o caminho de `corrigir(valor)` e fica INTACTO.
-
-HONESTIDADE SOBRE O LIMITE: isto reduz superficie, nao e' sandbox de verdade.
-Codigo determinado ainda escapa de allowlist de builtins em CPython, e a allowlist
-de atributos do modo serie NAO e' prova de contencao total. A fronteira REAL de
-seguranca e' OPERACIONAL: a POC roda sobre dados publicos (beers), offline, e nada
-mais deve ser executado aqui.
-"""
+"""Portao AST e execucao restrita do codigo Python gerado pelo LLM."""
 import ast
 import re
 
 NOME_FUNCAO = "corrigir"
 NOME_ARGUMENTO = "valor"
 
+# Namespace do exec e' sempre descartavel, nunca globals(). Ver docs/DECISOES.md#portao-ast.
 _CHAMADAS_PROIBIDAS = {
     "__import__", "eval", "exec", "compile", "open", "input",
     "globals", "locals", "vars", "getattr", "setattr", "delattr",
@@ -48,13 +23,8 @@ _BUILTINS_PERMITIDOS = {
     "KeyError": KeyError, "Exception": Exception, "None": None,
 }
 
-# ALLOWLIST de atributos do modo serie (deteccao `detectar(col) -> pd.Series`).
-# Conjunto pequeno e FECHADO = o idioma-alvo (str.contains e comparacoes
-# elementwise). No series_mode, todo `ast.Attribute` do corpo deve ter `.attr`
-# aqui; qualquer outro atributo REJEITA. Isso barra I/O em `col` (to_csv/
-# to_pickle), cross-row (duplicated/mode/groupby/shift/values/to_numpy/apply/
-# pipe) e travessia de submodulo de `pd` (read_csv/io/common/get_handle/eval).
-# NAO e' contencao total -- a fronteira real e' operacional (ver docstring).
+# Allowlist fechada de atributos do modo serie (detectar(col) -> pd.Series).
+# Ver docs/DECISOES.md#modo-serie.
 _ATRIBUTOS_SERIE = {
     "str", "contains", "startswith", "endswith", "match", "fullmatch",
     "astype", "eq", "ne", "isin", "isna", "notna", "fillna", "strip",
@@ -72,17 +42,7 @@ def validar(
     nome_argumento: str = NOME_ARGUMENTO,
     series_mode: bool = False,
 ) -> None:
-    """Portao AST. Defaults preservam o contrato antigo (`corrigir(valor)`).
-
-    Parametrizar `nome_funcao`/`nome_argumento` permite reusar o mesmo portao
-    para a funcao de deteccao (`detectar(col)`) sem duplicar a logica.
-
-    `series_mode=True` (ADITIVO): alem de todo o gate escalar, exige que TODO
-    `ast.Attribute` do corpo tenha `.attr` em `_ATRIBUTOS_SERIE`. Qualquer
-    atributo fora da allowlist REJEITA (bloqueia I/O e cross-row em `col` e
-    travessia de submodulo de `pd`). Com series_mode=False (default) o portao e'
-    EXATAMENTE o de antes.
-    """
+    """Valida a AST do codigo gerado; levanta CodigoRejeitado sem executar nada."""
     try:
         arvore = ast.parse(codigo)
     except SyntaxError as erro:
@@ -130,23 +90,14 @@ def materializar(
     nome_argumento: str = NOME_ARGUMENTO,
     series_mode: bool = False,
 ):
-    """Valida e devolve a funcao viva. Levanta CodigoRejeitado sem executar nada.
-
-    Defaults preservam `corrigir(valor)`. Passe `nome_funcao='detectar'`,
-    `nome_argumento='col'` e `series_mode=True` para materializar a funcao de
-    deteccao Series (`detectar(col) -> pd.Series`).
-
-    O namespace do exec e' o MESMO nos dois modos (`{re, __builtins__}`): `pd`
-    NAO entra. Em series_mode a diferenca esta so' no gate (allowlist de
-    atributos em `validar`); `col` chega como argumento em runtime, nao pelo
-    namespace.
-    """
+    """Valida o codigo e devolve a funcao viva; nao materializa se `validar` rejeitar."""
     validar(
         codigo,
         nome_funcao=nome_funcao,
         nome_argumento=nome_argumento,
         series_mode=series_mode,
     )
+    # pd fica fora do namespace do exec nos dois modos. Ver docs/DECISOES.md#modo-serie.
     namespace = {"re": re, "__builtins__": dict(_BUILTINS_PERMITIDOS)}
     exec(compile(codigo, "<regra-gerada>", "exec"), namespace, namespace)
     funcao = namespace.get(nome_funcao)
@@ -156,25 +107,7 @@ def materializar(
 
 
 def testar_fumaca(funcao, amostras, series_mode: bool = False) -> None:
-    """Chama a funcao e levanta CodigoRejeitado se ela explodir em runtime.
-
-    O portao AST valida ESTRUTURA e nao pega defeito que so' aparece em runtime.
-    Caso real: o agente 1 emitiu `(?i)...|(?i)...` como condicao_regex, o agente 2
-    copiou fiel, o AST aprovou (e Python estruturalmente valido) e a funcao lancou
-    `re.error` em TODAS as 3977 celulas -- reportando 0% de acerto e 0% de dano,
-    visualmente identico a uma regra so' ineficaz. Uma chamada de verdade custa
-    microssegundos e transforma falha silenciosa em rejeicao com feedback.
-
-    Escalar (default): `amostras` e' list[str]; chama `funcao(amostra)` por item.
-
-    series_mode=True: `amostras` chega como uma pd.Series ja montada pelo CHAMADOR
-    (o sandbox NAO importa pandas -- pd fica fora do namespace do exec). Aplica
-    `funcao` a ela UMA vez e exige o contrato Series: o retorno deve ser uma
-    pd.Series do MESMO tamanho da entrada. Retorno escalar (ex.: `'%' in col`),
-    array cru ou tamanho divergente sao REJEITADOS. O teste de tipo usa
-    `type(entrada)` (a propria Series de entrada) como referencia da classe
-    pd.Series, evitando importar pandas aqui.
-    """
+    """Chama a funcao com amostras reais e levanta CodigoRejeitado se ela falhar em runtime."""
     if not series_mode:
         for amostra in amostras:
             try:

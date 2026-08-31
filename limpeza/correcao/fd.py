@@ -1,16 +1,4 @@
-"""Camada 2 da cascata: dependencia funcional `A -> B`.
-
-Porta correction.py:808-866 do ZeroDC, com duas simplificacoes DECLARADAS:
-  - determinante UNICO (o ZeroDC aceita composto, correction.py:812);
-  - o candidato a determinante vem da MI normalizada (`calc_mi` abaixo), nao de
-    um retriever.
-
-O gate (validar_fd) exige 100% no conjunto rotulado, INCLUINDO os negativos
-limpos -- uma FD que conserta o sujo mas mexeria num limpo e' reprovada. A
-aplicacao usa o DUPLO FILTRO deteccao==0 nas duas colunas (determinante e
-dependente), como correction.py:824-826,853-864: so' linhas cujas duas colunas
-nao foram marcadas entram na moda.
-"""
+"""Etapa 4, camada 2 da cascata: propoe e aplica uma dependencia funcional `A -> B`."""
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from sklearn.metrics import mutual_info_score
@@ -20,13 +8,7 @@ from ..esquemas import DependenciaFuncional
 
 
 def calc_mi(df, alvo: str) -> dict:
-    """MI normalizada de cada coluna de `df` em relacao a `alvo`.
-
-    Devolve {coluna: mi_normalizada_1_casa}. A propria coluna `alvo` aparece
-    (tipicamente com 1.0) -- quem chama e' que exclui o alvo ao escolher
-    determinantes.
-    """
-
+    # Devolve {coluna: MI normalizada 1 casa}; `alvo` tambem aparece no resultado.
     def mi_par(col: str) -> float:
         if col == alvo:
             return float(mutual_info_score(df[alvo], df[col]))
@@ -47,7 +29,6 @@ def calc_mi(df, alvo: str) -> dict:
 
 
 def candidatos_determinantes(df, alvo: str, limiar: float | None = None) -> list[str]:
-    """Colunas (exceto o proprio alvo) com MI normalizada >= limiar."""
     limiar = config.MI_THRESHOLD if limiar is None else limiar
     mi = calc_mi(df, alvo)
     return [col for col, v in mi.items() if col != alvo and v >= limiar]
@@ -104,7 +85,6 @@ def propor_fd(
     df,
     agente=None,
 ) -> DependenciaFuncional:
-    """Um passe de LLM. `dependente` = coluna a corrigir; candidatos vem da MI."""
     agente = agente or construir_agente()
     prompt = ChatPromptTemplate.from_messages([("system", SISTEMA), ("human", HUMANO)])
     fd: DependenciaFuncional = (prompt | agente).invoke(
@@ -119,10 +99,7 @@ def propor_fd(
 
 
 def _moda_condicionada(df, mascara, determinante, dependente, valor_det, excluir=None):
-    """Moda de `dependente` entre linhas com `determinante == valor_det` e as
-    DUAS colunas com deteccao == 0 (duplo filtro). `excluir` tira um indice do
-    pool (usado para negativos limpos no gate). Devolve None se o pool e' vazio.
-    """
+    # Duplo filtro: so' linhas com deteccao==0 nas duas colunas entram na moda.
     condicao = (
         (df[determinante] == valor_det)
         & (mascara[determinante] == 0)
@@ -147,8 +124,7 @@ def _colunas_validas(fd: DependenciaFuncional, df) -> tuple[str, str] | None:
 
 
 def validar_fd(fd: DependenciaFuncional, rotulados: list[dict], df, mascara, dependente: str) -> bool:
-    """Gate 100% no conjunto rotulado (sujos + limpos). Determinante ausente do
-    df -> reprova sem lancar."""
+    """Gate de 100% no conjunto rotulado, incluindo os limpos. Ver docs/DECISOES.md#gates-de-100."""
     colunas = _colunas_validas(fd, df)
     if colunas is None:
         return False
@@ -169,11 +145,7 @@ def validar_fd(fd: DependenciaFuncional, rotulados: list[dict], df, mascara, dep
 
 
 def aplicar_fd(fd: DependenciaFuncional, df, indices_marcados, mascara, dependente: str) -> dict:
-    """Aplica a FD nas celulas marcadas. Duplo filtro deteccao==0.
-
-    Devolve {indice: novo_valor} SO' das celulas cujo valor mudou. FD invalida ou
-    sem pool -> nenhuma mudanca.
-    """
+    """Aplica a FD nas celulas marcadas com duplo filtro deteccao==0; devolve so' o que mudou."""
     colunas = _colunas_validas(fd, df)
     if colunas is None:
         return {}

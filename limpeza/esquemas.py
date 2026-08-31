@@ -1,28 +1,20 @@
-"""Contrato entre os dois agentes.
-
-O JSON e' apertado de proposito. Se ele fosse frouxo, o tradutor teria que
-inferir tambem -- e quando a correcao saisse errada voce nao saberia se falhou
-a inferencia (agente 1) ou a traducao (agente 2). Schema rigido mantem o
-diagnostico limpo.
-"""
+"""Contratos Pydantic (schemas JSON) trocados entre os agentes do pipeline."""
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 TipoErro = Literal[
-    "sufixo_ou_prefixo",        # '12.0 oz' -> '12.0'
-    "formato_numerico",         # '17.0' onde se espera '17'
-    "valor_sentinela",          # 'N/A', '-', 'desconhecido'
-    "valor_ausente",            # celula vazia: NAO recuperavel por regra local
-    "abreviacao_inconsistente", # 'CA' vs 'California'
+    "sufixo_ou_prefixo",
+    "formato_numerico",
+    "valor_sentinela",
+    "valor_ausente",  # celula vazia: nao recuperavel por regra local
+    "abreviacao_inconsistente",
     "nenhum",
     "outro",
 ]
 
 
 class CadeiaDePensamento(BaseModel):
-    """A entrega principal da POC. Quatro secoes fixas, na ordem do raciocinio."""
-
     observacao_da_amostra: str = Field(
         description="O que voce ve nos valores mostrados. Descreva, nao conclua ainda."
     )
@@ -81,21 +73,11 @@ class CodigoGerado(BaseModel):
     )
 
 
-# --------------------------------------------------------------------------- #
-# Modo end-to-end (--e2e): deteccao intra-coluna + cascata de correcao.
-# --------------------------------------------------------------------------- #
+# --- Modo end-to-end (--e2e): deteccao intra-coluna + cascata de correcao ---
 
 
 class RegraDeteccao(BaseModel):
-    """Contrato da deteccao INTRA-COLUNA (idioma Series-contains).
-
-    A funcao gerada e' `detectar(col) -> pd.Series[bool]`: recebe a COLUNA suja
-    inteira (uma pd.Series de strings) e devolve uma pd.Series booleana do mesmo
-    tamanho (True por linha corrompida). Ela NAO ve outras colunas -- so' a
-    propria coluna, elemento a elemento (o idioma `col.str.contains(...)`). Isto
-    NAO e' o `fun(df) -> Series` cross-column do ZeroDC; a limitacao (erros
-    dependentes de contexto passam batido) e' aceita para o beers.
-    """
+    """Contrato `detectar(col) -> pd.Series[bool]`. Ver docs/DECISOES.md#deteccao-intra-coluna."""
 
     erro_provavel: bool = Field(
         description="False se os representantes sujos nao sustentam a existencia "
@@ -120,8 +102,7 @@ class RegraDeteccao(BaseModel):
 
 
 class DependenciaFuncional(BaseModel):
-    """Uma FD `determinante -> dependente`, determinante UNICO (simplificacao
-    declarada; o ZeroDC aceita determinante composto)."""
+    """Uma FD `determinante -> dependente`, com determinante unico."""
 
     determinante: str = Field(description="Nome da coluna determinante (unica).")
     dependente: str = Field(description="Nome da coluna dependente (a que se corrige).")

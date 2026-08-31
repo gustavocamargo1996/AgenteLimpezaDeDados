@@ -5,18 +5,7 @@ import pandas as pd
 def aplicar_detectores(
     df: pd.DataFrame, funcoes_por_coluna: dict, log: list | None = None
 ) -> pd.DataFrame:
-    """Aplica `detectar(col)` por COLUNA e devolve mascara 0/1 no shape do df.
-
-    Contrato Series (plano secao 6/7, MANTENDO a assinatura): por coluna chama
-    `funcao(df[coluna])` UMA vez e le o resultado POSICIONALMENTE. Exige uma
-    pd.Series booleana do MESMO tamanho da coluna; coage o dtype com
-    `res.fillna(False).astype(bool)` e atribui a coluna da mascara por POSICAO
-    via `.to_numpy()` (nunca boolean-index por indice, que desalinha se a funcao
-    devolver indice proprio). Politica estrita, agora com granularidade
-    POR-COLUNA (declarada): se a funcao lanca, nao devolve Series ou devolve
-    tamanho errado, a coluna INTEIRA fica 0 e uma entrada entra no log. NAO le
-    clean -- auditavel: nenhum import de clean, nenhum parametro clean.
-    """
+    """Aplica `detectar(col)` por coluna; se a funcao falhar, a coluna inteira fica 0 e entra no log."""
     if log is None:
         log = []
     mascara = pd.DataFrame(0, index=df.index, columns=df.columns, dtype=int)
@@ -57,7 +46,6 @@ def aplicar_detectores(
 
 
 def construir_mascara(trabalhos: list, tabela) -> pd.DataFrame:
-    """Aplica o detector de cada trabalho e devolve a mascara 0/1 da tabela suja."""
     log: list = []
     mascara = aplicar_detectores(
         tabela.sujo, {t.coluna.nome: t.detector.funcao for t in trabalhos}, log

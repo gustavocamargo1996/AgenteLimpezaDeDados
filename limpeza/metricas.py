@@ -1,10 +1,4 @@
-"""Metricas do caminho e2e: deteccao (P/R/F1) e correcao (acerto/dano).
-
-Em ambas: acerto = das celulas ERRADAS, quantas consertou. dano = das que JA
-ESTAVAM CERTAS, quantas estragou. Sem `dano` a POC mente, porque numa coluna
-100% corrompida qualquer regra agressiva marca 100% de acerto. As duas
-funcoes excluem do calculo o orcamento rotulado (holdout) que o agente viu.
-"""
+"""Etapa 5: mede deteccao (P/R/F1) e correcao (acerto/dano) contra o clean."""
 import pandas as pd
 
 
@@ -14,19 +8,7 @@ def metricas_deteccao(
     limpo: pd.Series,
     holdout=None,
 ) -> dict:
-    """P/R/F1 de UMA coluna: mascara detectada vs verdade `sujo != limpo`.
-
-    Verdade de deteccao = `dirty != clean` (divergencia declarada do
-    `*_error_detection.csv` do repo, por transparencia). Exclui o holdout do
-    orcamento rotulado.
-
-    Guarda de DEGENERACAO (plano secao 6.7): quando nao ha erro real no conjunto
-    medido (tp+fn==0) a metrica nao e' definivel -- o recall seria 0/0. Nesse
-    caso devolve `mensuravel: False` e P/R/F1 = None (n/d), NUNCA 0.0 silencioso.
-    Isso separa "coluna sem erro a medir" de "detector que errou tudo" (este tem
-    tp+fn>0 e recall=0 legitimo). Reusa o mesmo padrao "NAO MENSURAVEL" da
-    correcao.
-    """
+    """P/R/F1 de uma coluna: mascara detectada vs verdade `sujo != limpo`, fora do holdout."""
     indices = sujo.index if holdout is None else sujo.index.difference(pd.Index(list(holdout)))
     verdade = (sujo.loc[indices] != limpo.loc[indices])
     predito = (mascara_col.loc[indices] == 1)
@@ -45,6 +27,7 @@ def metricas_deteccao(
     }
 
     if (tp + fn) == 0:
+        # Sem erro real no conjunto medido o recall seria 0/0: devolve None, nunca 0.0.
         base.update({
             "precisao": None,
             "recall": None,
@@ -77,12 +60,6 @@ def metricas_correcao(
     limpo: pd.Series,
     holdout=None,
 ) -> dict:
-    """Acerto/dano de UMA coluna apos a cascata, contra `clean`.
-
-    acerto = das celulas ERRADAS (sujo != limpo), quantas ficaram == limpo.
-    dano   = das celulas JA CERTAS (sujo == limpo), quantas sairam de limpo.
-    Exclui as celulas do orcamento rotulado (holdout) -- senao o numero infla.
-    """
     indices = sujo.index if holdout is None else sujo.index.difference(pd.Index(list(holdout)))
     sub_sujo = sujo.loc[indices]
     sub_limpo = limpo.loc[indices]

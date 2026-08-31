@@ -5,7 +5,6 @@ from typing import Any
 
 @dataclass
 class Coluna:
-    """Uma coluna da tabela, suja e (quando ha) a referencia limpa."""
     nome: str
     sujo: Any
     limpo: Any
@@ -15,7 +14,6 @@ class Coluna:
 
 @dataclass
 class Tabela:
-    """Os dois CSVs alinhados por linha, o nome do dataset e as colunas a processar."""
     sujo: Any
     limpo: Any
     nome: str
@@ -24,7 +22,6 @@ class Tabela:
 
 @dataclass
 class Amostra:
-    """O que o KMeans escolheu mostrar ao agente, com os rotulos do orcamento."""
     representantes: list[str]
     linhas: set[int]
     rotulados: list[dict]
@@ -34,21 +31,18 @@ class Amostra:
 
 @dataclass
 class Detector:
-    """Como achar o erro numa coluna."""
     codigo: str
     funcao: Any
     cadeia: str
     orcamento: dict = field(default_factory=dict)
     historico: list = field(default_factory=list)
-    # Documentais: o relatorio publica os dois campos que o agente emite junto
-    # do codigo. Nada no pipeline decide com base neles.
+    # Documentais: o relatorio os publica, mas nada no pipeline decide com base neles.
     erro_provavel: bool = False
     condicao_regex: str | None = None
 
 
 @dataclass
 class Correcao:
-    """Como consertar as celulas marcadas de uma coluna."""
     passos: list[dict]
     trilha: dict
     cadeia: str
@@ -56,7 +50,7 @@ class Correcao:
 
 @dataclass
 class Trabalho:
-    """Tudo que se sabe sobre uma coluna, preenchido ao longo das etapas."""
+    # Preenchido incrementalmente ao longo das etapas do pipeline.
     coluna: Coluna
     amostra: Amostra | None
     detector: Detector | None

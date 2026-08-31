@@ -88,17 +88,7 @@ devolva exatamente o mesmo codigo."""
 
 
 def _montar_feedback_det(funcao, rotulos: list[dict]) -> str:
-    """Feedback CUMULATIVO para o LLM de update.
-
-    `rotulos` = lista acumulada de {valor, eh_erro_real} de TODAS as iteracoes
-    ate agora. Para cada um recomputa a classificacao ATUAL de `funcao` e
-    destaca as discordancias:
-      FALSO POSITIVO = a regra marcou SUJO um valor que o oraculo diz LIMPO;
-      FALSO NEGATIVO = a regra deixou LIMPO um valor que o oraculo diz ERRO.
-    Cumulativo de proposito: sem isso a iteracao 3 poderia desfazer o conserto
-    da 1 (a discordancia ja resolvida some do feedback). Devolve o texto do
-    prompt.
-    """
+    """Feedback cumulativo (FALSO POSITIVO/NEGATIVO) de todos os rotulos ate agora, para o LLM."""
     marcas = _classificar(funcao, [r["valor"] for r in rotulos])
     linhas = []
     for r, marcado in zip(rotulos, marcas):
@@ -119,26 +109,8 @@ def _montar_feedback_det(funcao, rotulos: list[dict]) -> str:
 
 
 def _precisao_no_oraculo(funcao, rotulos: list[dict]) -> float | None:
-    """Precisao da regra VIVA no conjunto ROTULADO cumulativo do oraculo.
-
-    Guarda heuristica contra regra AMPLA DEMAIS (marca como erro valores que o
-    oraculo confirmou limpos). O 1o argumento e' o CALLABLE `detectar` vivo, NAO
-    o objeto RegraDeteccao: passar o pydantic faria `_classificar` cair na
-    excecao -> tudo False -> marcados=0 -> None e a guarda nunca dispararia
-    (recurso desligado em silencio).
-
-    `rotulos` = lista {valor, eh_erro_real} acumulada pelo loop. Aplica `funcao`
-    aos valores via `_classificar` (uma passada Series); `marcados` = os que a
-    regra diz SUJO. Se marca 0 -> None (sem over-flagging mensuravel; guarda
-    inerte). Senao devolve |marcados com eh_erro_real True| / |marcados|.
-
-    LIMITACAO DECLARADA (Armadilha 1 do plano): a precisao so' mede o que esta no
-    rotulado; e' CEGA a over-flagging em valores SEM representante limpo no
-    oraculo (rotulos todos sujos -> precisao 1.0 mesmo para uma regra ampla). NAO
-    resolver com fracao de celula (quebra ounces, ~100% erro real -> precisao
-    ~1.0, corretamente aceito). O piso final mitiga porque a propria amplitude da
-    regra tende a fazer o amostrador colher clean, mas nao e' garantia formal.
-    """
+    """Precisao da regra viva no conjunto rotulado cumulativo; guarda contra regra ampla demais."""
+    # `funcao` deve ser o callable `detectar`: passar o RegraDeteccao desligaria a guarda em silencio.
     marcas = _classificar(funcao, [r["valor"] for r in rotulos])
     marcados = [r for r, marcado in zip(rotulos, marcas) if marcado]
     if not marcados:
@@ -149,8 +121,7 @@ def _precisao_no_oraculo(funcao, rotulos: list[dict]) -> float | None:
 
 def _tentar_update(cadeia_update, coluna: str, codigo_atual: str, feedback: str):
     """Invoca o LLM de update e devolve (Detector novo, "") ou (None, motivo)."""
-    # O portao e' o mesmo do 1-passe: revisao que nao materializa nem passa na
-    # fumaca e' descartada, e o chamador mantem a regra anterior.
+    # Mesmo portao do 1-passe: revisao que nao passa fica descartada, o chamador mantem a anterior.
     try:
         nova: RegraDeteccao = cadeia_update.invoke(
             {"coluna": coluna, "codigo_atual": codigo_atual, "feedback": feedback}
@@ -172,8 +143,6 @@ def _tentar_update(cadeia_update, coluna: str, codigo_atual: str, feedback: str)
 
 def refinar_regra_deteccao(detector: Detector, coluna, agente, emb=None) -> Detector:
     """Refina `detectar(col)` por active learning com um oraculo, e devolve o Detector."""
-    # Por iteracao: amostra valores distintos novos, rotula pelo clique do
-    # oraculo, monta o feedback CUMULATIVO e pede uma revisao ao agente.
     prompt = ChatPromptTemplate.from_messages(
         [("system", SISTEMA_UPDATE), ("human", HUMANO_UPDATE)]
     )
@@ -225,8 +194,7 @@ def refinar_regra_deteccao(detector: Detector, coluna, agente, emb=None) -> Dete
             cadeia_update, coluna.nome, codigo_antes, feedback
         )
         if revisado is not None:
-            # Guarda por iteracao: a revisao roda, mas pode ser AMPLA DEMAIS.
-            # Precisao < LIMITE no oraculo cumulativo -> mantem a anterior.
+            # Guarda por iteracao: precisao abaixo do limite no oraculo cumulativo mantem a anterior.
             precisao = _precisao_no_oraculo(revisado.funcao, rotulos)
             if precisao is not None and precisao < config.LIMITE_PRECISAO_DETECCAO:
                 status = (
@@ -254,16 +222,14 @@ def refinar_regra_deteccao(detector: Detector, coluna, agente, emb=None) -> Dete
             "status": status,
         })
 
-    # Piso final: a guarda por iteracao mantem a regra anterior, entao uma
-    # resident ja ampla sobreviveria ao laco. Abaixo do LIMITE cai para nada.
+    # Piso final: a guarda por iteracao so' rejeita revisoes, uma resident ja ampla sobreviveria sem isto.
     precisao_final = _precisao_no_oraculo(detector.funcao, rotulos)
     if precisao_final is not None and precisao_final < config.LIMITE_PRECISAO_DETECCAO:
         codigo_antes_piso = detector.codigo
         feedback_piso = _montar_feedback_det(detector.funcao, rotulos)
         detector.funcao = materializar(DETECTA_NADA)
         detector.codigo = DETECTA_NADA
-        # Mesmo conjunto de chaves das entradas do laco: o relatorio le
-        # passo['iteracao'] direto e quebraria com um entry incompleto.
+        # Mesmas chaves das entradas do laco: relatorio.py le passo['iteracao'] direto.
         historico.append({
             "iteracao": len(historico) + 1,
             "amostrados": [],

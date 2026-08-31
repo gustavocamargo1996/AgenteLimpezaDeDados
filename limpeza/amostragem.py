@@ -1,18 +1,5 @@
-"""Embeddings locais (MiniLM ONNX) e selecao de representantes por KMeans.
-
-Usa tokenizers + onnxruntime direto, sem sentence-transformers -- que puxaria
-torch (~2 GB) para fazer mean pooling de 25 strings. O modelo ja esta em disco
-no clone do ZeroDC: nada e' baixado, nada sai da maquina.
-
-Ideia da selecao: em vez de mandar a coluna inteira ao LLM (caro e ruidoso),
-agrupa os valores distintos no espaco de embeddings e mostra, de cada grupo, o
-mais atipico e o mais tipico. O atipico expoe a corrupcao; o tipico ancora a
-norma.
-
-Limite estrutural que a POC existe para demonstrar: quando a corrupcao atinge
-100% da coluna, a forma corrompida E' a norma e nao ha atipico para achar.
-Nenhuma quantidade de clusters resolve isso.
-"""
+"""Etapa 2: embeddings locais (MiniLM ONNX) e selecao de representantes por KMeans."""
+# Limite conhecido: coluna 100% corrompida nao tem atipico. Ver docs/DECISOES.md#ponto-cego-da-corrupcao-universal.
 import numpy as np
 import onnxruntime as ort
 from sklearn.cluster import KMeans
@@ -50,7 +37,6 @@ class Embedder:
         return entrada, mascara
 
     def codificar(self, textos: list[str], lote: int = 64) -> np.ndarray:
-        """Devolve matriz (n, dim) com vetores normalizados (L2)."""
         blocos = []
         for inicio in range(0, len(textos), lote):
             fatia = [t if t else " " for t in textos[inicio : inicio + lote]]
@@ -74,6 +60,7 @@ class Embedder:
 
 def selecionar(matriz: np.ndarray, n_clusters=None, maximo=None) -> list[int]:
     """Indices (na lista de valores distintos) escolhidos como representantes."""
+    # `matriz` ja vem de valores_distintos, nao de celulas. Ver docs/DECISOES.md#kmeans-sobre-distintos.
     n_clusters = n_clusters or config.N_CLUSTERS
     maximo = maximo or config.MAX_REPRESENTANTES
 
@@ -108,7 +95,6 @@ _EMBEDDER: Embedder | None = None
 
 
 def embedder() -> Embedder:
-    """Embedder unico do processo -- o ONNX carrega uma vez por run."""
     global _EMBEDDER
     if _EMBEDDER is None:
         _EMBEDDER = Embedder()
@@ -132,9 +118,7 @@ def representantes(coluna: Coluna, emb=None) -> Amostra:
 
 
 def _rotular(coluna: Coluna, linhas: set) -> list[dict]:
-    """Orcamento de rotulos: o par sujo->limpo das linhas efetivamente exibidas."""
-    # Estas linhas sao tambem o holdout da metrica: medir sobre um valor ja
-    # mostrado ao agente mede memorizacao, nao generalizacao.
+    # Estas linhas sao tambem o holdout da metrica: medi-las mediria memorizacao.
     rotulados = []
     for idx in sorted(linhas):
         sujo, limpo = coluna.sujo.at[idx], coluna.limpo.at[idx]

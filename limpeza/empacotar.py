@@ -1,48 +1,12 @@
-"""Empacota as regras geradas num limpador.py AUTONOMO e reutilizavel.
-
-O limpador NAO e' "inlinar funcoes" -- e' uma COPIA CONGELADA da logica de
-aplicacao da cascata (camadas 1 e 2: codigo e FD) mais as regras geradas. Ele
-reproduz a semantica exata do run que o gerou:
-
-  - a mascara e' construida sobre o df ORIGINAL, por coluna, POSICIONALMENTE
-    (espelho de deteccao.construir_mascara);
-  - a correcao aplica primeiro o corretor de CODIGO e depois a FD (duplo-filtro
-    deteccao==0 nas duas colunas), na ordem da cascata, lendo SEMPRE o df de
-    entrada intacto e escrevendo numa copia;
-  - celula marcada que nenhuma camada alterou vira FLAG.
-
-O .py gerado nao importa a POC nem usa o sandbox em runtime: e' Python legivel
-(re + pandas) que o usuario le e roda. O codigo de deteccao/correcao ja passou
-pelo portao AST+allowlist do sandbox NA GERACAO; o cabecalho do limpador declara
-isso e pede revisao antes de producao.
-
-Contrato de `gerar_limpador`:
-  detectores_codigo: {coluna: codigo_str de detectar(col)} -- uma entrada por
-    coluna processada (mesmo as que nao acharam erro: cai em DETECTA_NADA).
-  plano_correcao: {coluna: [passo, ...]} onde cada passo e' um dict:
-    {"tipo": "codigo", "codigo": <corrigir(valor) str>} e/ou
-    {"tipo": "fd", "determinante": <col>, "dependente": <col>}.
-    Codigo e FD PODEM COEXISTIR numa coluna (na ordem: codigo depois FD).
-  colunas: ordem de processamento (as chaves de dominio ficam SO' aqui, como
-    dados -- nenhuma logica hardcoda nome de coluna).
-"""
+"""Etapa 6: empacota os detectores e correcoes num limpador.py autonomo e reproduzivel."""
 import re
 from pathlib import Path
 
-# Idioma Series alinhado a `col`, tudo-False -- espelha deteccao.DETECTA_NADA.
-# Usado quando uma coluna nao trouxe codigo de deteccao (defensivo).
+# Fallback quando uma coluna nao trouxe codigo de deteccao (espelha DETECTA_NADA).
 _DETECTA_NADA = "def detectar(col):\n    return col.isin([])\n"
 
 
 def _sufixos_seguros(colunas: list[str]) -> dict:
-    """Mapeia cada coluna a um sufixo de identificador Python UNICO.
-
-    O nome de coluna vira nome de funcao (`_detectar_<sufixo>`), entao precisa
-    ser identificador valido: nao-alnum vira '_', e um prefixo entra se comeca
-    por digito ou fica vazio. Colisao (duas colunas -> mesmo sufixo) e' desfeita
-    com um contador. O nome de coluna REAL segue sendo a chave dos dicts do
-    limpador -- este sufixo e' so' cosmetico para o nome da funcao.
-    """
     usados: set = set()
     mapa: dict = {}
     for i, col in enumerate(colunas):
@@ -60,17 +24,12 @@ def _sufixos_seguros(colunas: list[str]) -> dict:
 
 
 def _renomear(codigo: str, de: str, para: str) -> str:
-    """Renomeia a UNICA def `de` para `para`, preservando o corpo intacto.
-
-    Regex tolerante a espacos (`def  detectar (`). O sandbox ja garantiu que ha
-    exatamente uma funcao com esse nome, entao count=1 e' suficiente.
-    """
+    """Renomeia a unica def `de` para `para`, preservando o corpo intacto."""
     texto = re.sub(rf"\bdef\s+{re.escape(de)}\s*\(", f"def {para}(", codigo.strip(), count=1)
     return texto.rstrip() + "\n"
 
 
 def _passos_de(plano_correcao: dict, coluna: str) -> tuple:
-    """Extrai (codigo_correcao_str | None, (det, dep) | None) do plano da coluna."""
     corretor = None
     fd = None
     for passo in plano_correcao.get(coluna, []) or []:
@@ -81,11 +40,7 @@ def _passos_de(plano_correcao: dict, coluna: str) -> tuple:
     return corretor, fd
 
 
-# --------------------------------------------------------------------------- #
-# Corpo ESTATICO do limpador: mascara + FD (duplo-filtro) + aplicar + __main__.
-# Copia congelada da cascata (camadas 1 e 2). NAO simplificar a coercao da
-# mascara nem o duplo-filtro: sao o que garante a reproducao do run.
-# --------------------------------------------------------------------------- #
+# Corpo estatico: NAO editar comentarios/docstrings aqui dentro (comparado byte a byte pela fixture do teste).
 _ESTATICO = '''
 def _mascara(df):
     """Espelho de deteccao.construir_mascara: mascara BOOL por coluna, posicional.
@@ -249,13 +204,7 @@ def escrever_limpador(
     plano_correcao: dict,
     colunas: list,
 ) -> Path:
-    """Escreve um limpador .py autonomo e devolve o Path.
-
-    Emite: cabecalho + imports; `_detectar_<col>` por coluna; `_corrigir_<col>`
-    por coluna com corretor; os dicts `_DETECTORES`/`_CORRETORES`/`FDS`/`COLUNAS`
-    (as chaves sao os nomes de coluna reais, unico lugar onde eles aparecem);
-    e o corpo estatico (`_mascara`, `_aplicar_fd`, `aplicar`, `__main__`).
-    """
+    """Escreve um limpador .py autonomo (deteccao + correcao + corpo estatico) e devolve o Path."""
     caminho = Path(caminho)
     colunas = list(colunas)
     sufixos = _sufixos_seguros(colunas)
@@ -282,8 +231,7 @@ def escrever_limpador(
         if corretor and fd is not None:
             coocorrencia.append(str(col))
 
-    # Dicts que ligam nome-de-coluna REAL -> funcao. As chaves (repr) sao o unico
-    # ponto onde nome de coluna de dominio aparece; nenhuma logica os hardcoda.
+    # Chaves (repr) sao o unico ponto onde nome de coluna de dominio aparece.
     def _dict_funcs(mapa: dict) -> str:
         if not mapa:
             return "{}"
@@ -311,7 +259,6 @@ def escrever_limpador(
         "\n\n".join(partes[: len(colunas)]) if colunas else "",
     ]
 
-    # corretores (as partes apos os detectores)
     corretor_partes = partes[len(colunas):]
     if corretor_partes:
         blocos += [

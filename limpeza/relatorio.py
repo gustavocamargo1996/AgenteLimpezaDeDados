@@ -17,8 +17,6 @@ def _fmt_pct(v) -> str:
 
 def _bloco_refinamento(historico: list, orcamento) -> str:
     """Historico do loop de refinamento de UMA coluna, so' emitido quando N>1."""
-    # Por iteracao: o que o oraculo rotulou, se a regra mudou e o codigo
-    # resultante. Fecha com o orcamento (custo) do oraculo.
     linhas = []
     if orcamento:
         linhas.append(
@@ -60,12 +58,10 @@ def escrever(saida: Path, nome: str, trabalhos: list, mascara, corrigido, medida
 
 
 def _titulo(assunto: str, nome: str) -> str:
-    """Cabecalho comum dos .md, com o nome do dataset."""
     return f"# {assunto} -- `{nome}`"
 
 
 def _cascata_md(nome: str, trabalhos: list) -> str:
-    """Qual camada resolveu cada coluna, com a contagem que fecha o invariante."""
     linhas = [
         _titulo("Cascata de correcao", nome),
         f"\nModelo `{config.MODELO_LLM}`\n",
@@ -104,8 +100,6 @@ def _cascata_md(nome: str, trabalhos: list) -> str:
 
 
 def _cadeias_md(nome: str, trabalhos: list) -> str:
-    """Cadeia, criterio e codigo de deteccao de cada coluna, com o refinamento."""
-    # O bloco por coluna e' o do 1-passe; o historico do loop so' entra com N>1.
     partes = [
         _titulo("Cadeias de deteccao", nome),
         f"\nDeteccao INTRA-COLUNA (a regra ve um escalar, nao a linha). "

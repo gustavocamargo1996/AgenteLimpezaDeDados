@@ -1,28 +1,11 @@
-"""Orquestracao da cascata de correcao: codigo -> FD.
-
-Sobre as celulas com mascara == 1, cada camada tem PORTAO contra o orcamento
-rotulado (sujos + limpos).
-
-Regra de escalonamento (onde `mask = dirty != corrections` zera a deteccao das
-celulas que mudaram):
-  - uma celula so' e' considerada resolvida por uma camada se a camada ALTEROU
-    seu valor;
-  - celula que a camada deixou intacta ESCALA para a proxima;
-  - gate reprovado -> TODAS as celulas marcadas escalam.
-
-Celula que nenhuma camada resolve fica nao-resolvida (sujo, flagada).
-
-Invariante contabil: por coluna,
-    contagem[codigo] + contagem[fd] + contagem[nao_resolvida]
-    == numero de celulas marcadas.
-"""
+"""Etapa 4: cascata de correcao codigo -> FD, com gate de 100% e escalonamento celula a celula."""
 from .. import config
 from ..tipos import Correcao
 from . import fd as fd_mod, regras
 
 
 def _gate_codigo(funcao, rows: list[dict]) -> bool:
-    """100% no conjunto rotulado (sujos e limpos). funcao None -> reprova."""
+    """Reprova a regra inteira se errar 1 unico rotulado. Ver docs/DECISOES.md#gates-de-100."""
     if funcao is None:
         return False
     for r in rows:
@@ -37,13 +20,6 @@ def _gate_codigo(funcao, rows: list[dict]) -> bool:
 
 
 def _camada_codigo(coluna, rotulados, agentes):
-    """Reusa agente 1 (budget) + agente 2. Devolve (regra, funcao, codigo_str).
-
-    O terceiro elemento e' o TEXTO do `corrigir(valor)` gerado (`traducao`
-    ["codigo"]), antes descartado. `rodar_cascata` o captura para empacotar o
-    limpador autonomo -- e' a copia fiel da correcao de codigo aplicada quando o
-    gate passa.
-    """
     regra = regras.especificar(
         coluna=coluna,
         itens=rotulados["itens"],
@@ -64,26 +40,19 @@ def rodar_coluna(
     agentes: dict,
     mi_threshold: float | None = None,
 ) -> tuple[dict, dict]:
-    """Devolve (correcoes_col, trilha).
-
-    correcoes_col: {indice: valor_final} das celulas resolvidas (codigo/fd).
-    Celulas nao resolvidas NAO entram -- ficam sujas no fim.
-    trilha: diagnostico por celula e por camada (ver invariante contabil).
-    """
+    """Roda a cascata numa coluna e devolve (correcoes_por_indice, trilha diagnostica)."""
     indices_marcados = list(mascara_col[mascara_col == 1].index)
     rows = rotulados["rows"]
 
     correcoes: dict = {}
+    # Nenhuma camada resolve -> fica flagada, nunca com valor inventado. Ver docs/DECISOES.md#flag-em-vez-de-chute.
     trilha_celula = {idx: "nao_resolvida" for idx in indices_marcados}
     contagem = {"codigo": 0, "fd": 0, "nao_resolvida": 0}
     pendentes = list(indices_marcados)
     log: list = []
 
-    # -------- Camada 1: codigo -------------------------------------------------
     regra, funcao, codigo_str = _camada_codigo(coluna, rotulados, agentes)
     gate_codigo = _gate_codigo(funcao, rows)
-    # Captura o corretor SEMPRE que o gate passou (mesmo que mude 0 celulas -- e'
-    # inocuo e reproduz). None quando reprovou: nao entra no plano do limpador.
     codigo_correcao = codigo_str if gate_codigo else None
     if gate_codigo and pendentes:
         restantes = []
@@ -102,7 +71,6 @@ def rodar_coluna(
                 restantes.append(idx)  # intacta escala
         pendentes = restantes
 
-    # -------- Camada 2: FD -----------------------------------------------------
     fd = None
     gate_fd = None
     candidatos = fd_mod.candidatos_determinantes(df, coluna, limiar=mi_threshold)
@@ -121,7 +89,6 @@ def rodar_coluna(
                     restantes.append(idx)  # intacta escala
             pendentes = restantes
 
-    # -------- Sobra: nao resolvida ---------------------------------------------
     contagem["nao_resolvida"] = len(pendentes)
 
     trilha = {
@@ -169,7 +136,6 @@ def rodar_cascata(trabalhos: list, tabela, mascara, agentes: dict):
 
 
 def _rotulados(trabalho) -> dict:
-    """O orcamento rotulado da coluna, no formato que as duas camadas leem."""
     amostra = trabalho.amostra
     return {
         "rows": amostra.rotulados,
@@ -181,8 +147,7 @@ def _rotulados(trabalho) -> dict:
 
 def _itens(coluna, amostra) -> list[dict]:
     """Amostra do especificador: cada representante com seu par limpo e a ambiguidade."""
-    # Um mesmo valor sujo pode ter varios limpos (127 celulas vazias de `state`
-    # viram 38 estados). Reduzir a moda ensinaria uma regra falsa ao agente.
+    # Um sujo pode mapear para varios limpos; nao reduzir a moda. Ver docs/DECISOES.md#orcamento-vs-gabarito.
     itens = []
     for valor in amostra.representantes:
         distintos = coluna.limpo[coluna.sujo == valor].unique().tolist()
@@ -198,8 +163,7 @@ def _itens(coluna, amostra) -> list[dict]:
 
 
 def _passos(trilha: dict) -> list[dict]:
-    """Plano ORDENADO da coluna: o corretor de codigo e depois a FD, se passaram."""
-    # Codigo e FD podem coexistir; coluna sem nenhum so' detecta e flaga.
+    # Ordem fixa: codigo, depois FD (podem coexistir; sem nenhum a coluna so' flaga).
     passos: list[dict] = []
     if trilha.get("codigo_correcao"):
         passos.append({"tipo": "codigo", "codigo": trilha["codigo_correcao"]})
@@ -213,7 +177,6 @@ def _passos(trilha: dict) -> list[dict]:
 
 
 def _trilha_de_falha(coluna: str, mascara_col, exc: Exception) -> dict:
-    """Trilha de uma coluna cuja cascata quebrou: tudo marcado fica nao-resolvido."""
     idx_marcados = list(mascara_col[mascara_col == 1].index)
     motivo = f"cascata falhou: {type(exc).__name__}: {exc}"
     return {

@@ -34,8 +34,7 @@ def gerar_limpador(caminho_sujo, caminho_limpo, colunas=None,
 
 def _processar_coluna(coluna: Coluna, agentes: dict) -> Trabalho:
     """Amostra, detecta e refina uma coluna. Aqui mora toda a resiliencia do run."""
-    # Duas politicas: sem regra de 1-passe a coluna sai sem marcacao; com ela,
-    # um refino que quebra devolve a regra de 1-passe, que ja passou no portao.
+    # Refino que quebra devolve a regra de 1-passe (ja validada), nunca deixa a coluna sem regra.
     amostra = amostragem.representantes(coluna)
     print(f"  {coluna.nome}: deteccao a partir de "
           f"{len(amostra.representantes)} representantes sujos...", flush=True)
@@ -65,7 +64,6 @@ def _processar_coluna(coluna: Coluna, agentes: dict) -> Trabalho:
 
 
 def _construir_agentes() -> dict:
-    """Um agente por papel, todos no modelo configurado."""
     modelo = config.MODELO_LLM
     return {
         "deteccao": deteccao.construir_agente(modelo),
@@ -76,7 +74,6 @@ def _construir_agentes() -> dict:
 
 
 def _anunciar(tabela) -> None:
-    """Uma linha com o que este run vai processar."""
     nomes = [c.nome for c in tabela.colunas]
     print(f"[e2e] dataset={tabela.nome} | {len(tabela.sujo)} linhas "
           f"| colunas={nomes}", flush=True)
@@ -86,7 +83,6 @@ def _anunciar(tabela) -> None:
 
 
 def _anunciar_oraculo(coluna: Coluna, detector) -> None:
-    """O custo do refinamento da coluna, em valores e celulas rotuladas."""
     orcamento = detector.orcamento
     if orcamento:
         print(f"  {coluna.nome}: oraculo rotulou "

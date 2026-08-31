@@ -1,16 +1,9 @@
-"""CLI da POC: le os argumentos, chama a espinha e imprime o resultado.
-
-Uso:
-    python main.py --sujo dados_sujo.csv --limpo dados_limpo.csv
-    python main.py --sujo dados_sujo.csv --limpo dados_limpo.csv --colunas ounces,state
-    python main.py --sujo dados_sujo.csv --limpo dados_limpo.csv --colunas todas
-"""
+"""CLI da POC: le os argumentos, chama a espinha do pipeline e imprime o resultado."""
 import argparse
 import sys
 from pathlib import Path
 
-# Windows abre o stdout em cp1252 e as cadeias saem com mojibake no terminal.
-# Os arquivos .md ja saem em utf-8; isto conserta so' a impressao.
+# Windows abre o stdout em cp1252 (mojibake); isto forca utf-8 so' na impressao.
 for fluxo in (sys.stdout, sys.stderr):
     if hasattr(fluxo, "reconfigure"):
         fluxo.reconfigure(encoding="utf-8", errors="replace")
@@ -19,7 +12,6 @@ from limpeza import config, dados, pipeline  # noqa: E402
 
 
 def _argumentos(argv=None):
-    """Le a linha de comando."""
     ap = argparse.ArgumentParser(
         description="POC: geracao de limpador autonomo a partir do dirty e do clean")
     ap.add_argument("--sujo", required=True, help="CSV com os dados sujos")
@@ -40,7 +32,6 @@ def _argumentos(argv=None):
 
 
 def _aplicar_config(args) -> None:
-    """Passa as escolhas da linha de comando para o config, que o pipeline le."""
     config.MODELO_LLM = args.modelo
     config.ITERACOES_DETECCAO = args.iteracoes_deteccao
     config.AMOSTRAS_POR_ITERACAO = args.amostras_iter
@@ -48,7 +39,6 @@ def _aplicar_config(args) -> None:
 
 
 def _imprimir(limpador, medida: dict) -> None:
-    """Resumo por coluna: P/R/F1 da deteccao e acerto/dano da correcao."""
     print(f"\n  [e2e] artefatos em {limpador.parent}")
     print(f"  [e2e] limpador autonomo: {limpador}\n")
     for nome, d in medida["deteccao"].items():

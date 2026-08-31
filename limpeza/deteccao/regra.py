@@ -1,23 +1,4 @@
-"""Deteccao INTRA-COLUNA: constroi a propria mascara de erros, sem ver clean.
-
-Decisao de desenho DECLARADA: a regra e' `detectar(col) -> pd.Series[bool]`;
-recebe a COLUNA suja inteira (uma pd.Series de strings) e devolve uma pd.Series
-booleana do mesmo tamanho (True por linha corrompida), SEM olhar outras colunas.
-O idioma e' `col.str.contains(marcador)` -- o mesmo com que o ZeroDC atinge
-abv/city F1=1.0 (regras reais: abv=`df['abv'].str.contains('%')`, city=` [A-Z]{2}$`).
-Suficiente para o beers (todo erro e' visivel na propria coluna: sufixo em
-ounces, '%' em abv, 'N/A' em ibu, ' XX' final em city, vazio em state). NAO e' o
-`fun(df) -> Series` cross-column do ZeroDC (detection.py:147-155,269): so' a
-propria coluna -- erros dependentes de contexto passam batido aqui, e essa
-limitacao e' aceita para esta POC.
-
-Um unico passe de LLM por coluna (sem loop de active learning): o agente ve so'
-os representantes SUJOS e emite a RegraDeteccao ja com o `codigo` de
-`detectar(col)`. O codigo passa pelo portao AST do sandbox em modo serie
-(`series_mode=True`: allowlist de atributos; `pd` fora do namespace).
-`construir_mascara` aplica `detectar(col)` uma vez por coluna e le o resultado
-POSICIONALMENTE; NAO importa nem le clean -- auditavel neste arquivo.
-"""
+"""Etapa 3: gera a regra de deteccao intra-coluna `detectar(col) -> pd.Series[bool]`."""
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
@@ -77,11 +58,8 @@ escolhidos por agrupamento semantico:
 
 Escreva a cadeia e o `codigo` de `detectar(col)`."""
 
-# Fallback de 1 passe: se o unico invoke nao devolve codigo que passe no portao,
-# nao marca nada (mascara toda 0 nesta coluna). Nao ha laco de reparo -- a decisao
-# foi deteccao em 1 passe. Nunca inventa deteccao. No idioma Series, tudo-False
-# alinhado a `col` = `col.isin([])` (usa so' o atributo permitido `isin`, sem pd
-# nem `.index`); passa na allowlist do series_mode.
+# Sentinela de fallback: nao marca nada. Usa so' `isin`, permitido pela
+# allowlist do modo serie (ver docs/DECISOES.md#modo-serie).
 DETECTA_NADA = "def detectar(col):\n    return col.isin([])\n"
 
 _AMOSTRAS_FUMACA = ["12.0 oz", "", "N/A", "17.0", "Portland CA"]
@@ -136,13 +114,11 @@ def gerar_regra_deteccao(coluna, amostra, agente=None) -> Detector:
 
 
 def materializar(codigo: str):
-    """Compila `detectar(col)` pelo portao AST do sandbox, em modo Series."""
     return sandbox.materializar(codigo, nome_funcao="detectar",
                                 nome_argumento="col", series_mode=True)
 
 
 def detector_de(regra: RegraDeteccao, funcao) -> Detector:
-    """Embrulha a regra validada e sua funcao viva num Detector."""
     return Detector(
         codigo=regra.codigo or DETECTA_NADA,
         funcao=funcao,

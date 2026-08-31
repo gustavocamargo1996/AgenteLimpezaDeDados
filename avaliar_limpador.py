@@ -1,19 +1,4 @@
-"""Mede a QUALIDADE de um limpador gerado: aplica-o ao dirty e compara com clean.
-
-F1 de REPARO (padrao de data-cleaning, alinhado ao calc_p_r_f do ZeroDC). Por celula:
-  erro    = dirty != clean           (erro real que existe)
-  mudanca = corrigido != dirty       (o que o limpador alterou)
-  TP      = mudanca E corrigido==clean   (alterou E ficou certo)
-  Precisao = TP / |mudanca|   (das alteracoes, quantas ficaram certas; None se 0 mudancas)
-  Recall   = TP / |erro|      (dos erros, quantos foram consertados; None se 0 erros)
-  F1       = 2*P*R/(P+R)
-
-Degenerado (coluna sem erro real) -> mensuravel:false, nao 0.0 silencioso (mesmo padrao
-do resto da POC). Reporta tambem celulas FLAGADAS (detectadas e nao corrigidas).
-
-Uso:
-    python avaliar_limpador.py --limpador <path.py> --sujo <dirty.csv> --limpo <clean.csv>
-"""
+"""CLI: aplica um limpador gerado ao dirty e mede o F1 de reparo contra o clean."""
 import argparse
 import importlib.util
 import warnings
