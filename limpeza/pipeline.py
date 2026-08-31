@@ -49,7 +49,7 @@ def _processar_coluna(coluna: Coluna, agentes: dict) -> Trabalho:
                             f"deteccao falhou ({type(exc).__name__}); "
                             "coluna nao marcada"))
 
-    if detector.codigo != deteccao.DETECTA_NADA:
+    if config.ITERACOES_DETECCAO > 1 and detector.codigo != deteccao.DETECTA_NADA:
         print(f"  {coluna.nome}: refinando por "
               f"{config.ITERACOES_DETECCAO} iteracoes com oraculo...", flush=True)
         try:

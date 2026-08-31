@@ -131,10 +131,58 @@ def test_espinha_absorve_os_dicionarios_paralelos_num_trabalho(tmp_path, monkeyp
     for trabalho in vistos:
         trilha = trabalho.correcao.trilha
         contagem = trilha["contagem"]
-        assert trabalho.detector.codigo == DETECTA_OZ.strip()
+        # ITERACOES_DETECCAO=1 (via _fingir_agentes): 1-passe, sem refino, codigo sem strip.
+        assert trabalho.detector.codigo == DETECTA_OZ
         assert trilha["coluna"] == trabalho.coluna.nome
         assert sum(contagem.values()) == trilha["marcadas"]
         assert set(trabalho.medida) == {"deteccao", "correcao"}
+
+
+def test_iteracoes_deteccao_1_nao_refina(monkeypatch):
+    """Gate de _processar_coluna: N=1 e' 1-passe puro, o refino nunca e' chamado."""
+    from limpeza.tipos import Detector
+
+    de_1_passe = Detector(codigo=DETECTA_OZ, funcao=lambda col: col.str.endswith("oz"),
+                          cadeia="sufixo oz")
+    chamadas = []
+
+    monkeypatch.setattr(amostragem, "representantes", lambda coluna: _amostra())
+    monkeypatch.setattr(config, "ITERACOES_DETECCAO", 1)
+    monkeypatch.setattr(deteccao, "gerar_regra_deteccao", lambda *_a, **_k: de_1_passe)
+    monkeypatch.setattr(deteccao, "refinar_regra_deteccao",
+                        lambda *_a, **_k: chamadas.append(1) or de_1_passe)
+
+    trabalho = pipeline._processar_coluna(_coluna("ounces"), {"deteccao": None})
+
+    assert chamadas == []
+    assert trabalho.detector is de_1_passe
+    assert trabalho.detector.codigo == DETECTA_OZ
+
+
+def test_iteracoes_deteccao_maior_que_1_refina(monkeypatch):
+    """Gate de _processar_coluna: N>1 aciona o loop de refino sobre a regra de 1-passe."""
+    from limpeza.tipos import Detector
+
+    de_1_passe = Detector(codigo=DETECTA_OZ, funcao=lambda col: col.str.endswith("oz"),
+                          cadeia="sufixo oz")
+    refinado = Detector(codigo=DETECTA_OZ.strip(), funcao=de_1_passe.funcao,
+                        cadeia="sufixo oz, refinado")
+    chamadas = []
+
+    def refinar(*_a, **_k):
+        chamadas.append(1)
+        return refinado
+
+    monkeypatch.setattr(amostragem, "representantes", lambda coluna: _amostra())
+    monkeypatch.setattr(config, "ITERACOES_DETECCAO", 2)
+    monkeypatch.setattr(deteccao, "gerar_regra_deteccao", lambda *_a, **_k: de_1_passe)
+    monkeypatch.setattr(deteccao, "refinar_regra_deteccao", refinar)
+
+    trabalho = pipeline._processar_coluna(_coluna("ounces"), {"deteccao": None})
+
+    assert chamadas == [1]
+    assert trabalho.detector is refinado
+    assert trabalho.detector.codigo == DETECTA_OZ.strip()
 
 
 def test_refino_que_falha_mantem_a_regra_de_1_passe(monkeypatch):

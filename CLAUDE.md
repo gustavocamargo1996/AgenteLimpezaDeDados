@@ -258,7 +258,7 @@ A detecção hoje é **intra-coluna**: o contrato é
 booleano por linha, sem olhar as outras colunas. O **próximo projeto do
 usuário** é trocar esse contrato por uma forma cross-column.
 
-Essa restrição está concentrada em **7 pontos, 3 arquivos**. Ela está
+Essa restrição está concentrada em **10 pontos, 7 arquivos**. Ela está
 concentrada de propósito: se uma tarefa espalhar esse conhecimento, o próximo
 projeto passa a ter que redescobrir o contrato em vez de trocá-lo num lugar
 só.
@@ -270,14 +270,20 @@ só.
 | 3 | `limpeza/sandbox.py::materializar` | `pd` fora do namespace do exec | não |
 | 4 | `limpeza/deteccao/regra.py` | o prompt declara `detectar(col)` (4 ocorrências) | não |
 | 5 | `limpeza/deteccao/regra.py::DETECTA_NADA` | sentinela `"def detectar(col): ..."` | não |
-| 6 | `limpeza/deteccao/mascara.py` | aplica `detectar(col)` uma vez por coluna, posicional | não |
-| 7 | `limpeza/empacotar.py` | cópia congelada da mesma aplicação, no limpador gerado | não |
+| 6 | `limpeza/deteccao/refino.py` | `SISTEMA_UPDATE`/`HUMANO_UPDATE` repetem o contrato `detectar(col) -> pd.Series[bool]`, "NAO ve outras colunas" e a proibição de cross-row | não — o loop reescreve a regra a cada iteração |
+| 7 | `limpeza/deteccao/oraculo.py` (`_classificar`, `_amostrar_oraculo`) | chama `funcao(pd.Series(valores))` sobre valores distintos, não sobre linhas | não — premissa intra-coluna na lógica, não só no prompt |
+| 8 | `limpeza/deteccao/mascara.py` | aplica `detectar(col)` uma vez por coluna, posicional | não |
+| 9 | `limpeza/esquemas.py::RegraDeteccao` | docstring da classe e `description` do campo `codigo` repetem o contrato | não |
+| 10 | `limpeza/empacotar.py` | cópia congelada da mesma aplicação, no limpador gerado | não |
 
-**Regra para qualquer tarefa daqui em diante:** esses 7 pontos continuam sendo
-os *únicos* lugares que sabem que a detecção é intra-coluna. Em particular,
-`Detector` guarda `codigo`/`funcao` sem interpretar a assinatura (seção 4), e a
-máscara é consumida como `DataFrame[bool]` pelas etapas 4, 5 e 6, que não
-precisam saber como ela foi construída. Não acrescente um oitavo ponto.
+**Regra para qualquer tarefa daqui em diante:** esses 10 pontos continuam
+sendo os *únicos* lugares que sabem que a detecção é intra-coluna. Em
+particular, `Detector` guarda `codigo`/`funcao` sem interpretar a assinatura
+(seção 4). A máscara, porém, **não** é `DataFrame[bool]` dentro da POC: ela
+nasce `dtype=int` em `deteccao/mascara.py`, e `correcao/cascata.py` e
+`metricas.py` a comparam com `== 1`; só o limpador empacotado
+(`empacotar.py::_mascara`) reconstrói a sua própria versão `bool`. Não
+acrescente um décimo primeiro ponto.
 
 Lista original: `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`,
 seção 9. Racional: `docs/DECISOES.md#deteccao-intra-coluna`.

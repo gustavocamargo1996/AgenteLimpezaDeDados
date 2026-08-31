@@ -1,4 +1,4 @@
-"""Carga dos CSVs sujo/limpo e montagem das colunas a processar."""
+"""Etapa 1 -- carga dos CSVs sujo/limpo e montagem das colunas a processar."""
 import re
 from pathlib import Path
 

@@ -34,5 +34,3 @@ LIMITE_PRECISAO_DETECCAO = 0.8
 BONUS_ARTEFATO_X = True
 # Corte de MI normalizada para eleger colunas candidatas a determinante da FD.
 MI_THRESHOLD = 0.5
-
-NULO = "null"  # sentinela de ausencia: NaN vira a string 'null'
