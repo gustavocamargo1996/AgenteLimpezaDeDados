@@ -1,4 +1,4 @@
-"""Etapa 5: mede deteccao (P/R/F1) e correcao (acerto/dano) contra o clean."""
+"""Etapa 6: mede deteccao (P/R/F1) e correcao (acerto/dano) contra o clean."""
 import pandas as pd
 
 

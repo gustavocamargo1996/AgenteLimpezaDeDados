@@ -1,4 +1,4 @@
-"""Etapa 6: empacota os detectores e correcoes num limpador.py autonomo e reproduzivel."""
+"""Etapa 5: empacota os detectores e correcoes num limpador.py autonomo e reproduzivel."""
 import re
 from pathlib import Path
 

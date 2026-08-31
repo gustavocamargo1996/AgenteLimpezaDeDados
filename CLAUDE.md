@@ -110,12 +110,9 @@ limpeza/
   relatorio.py              artefatos por execução (cadeias_deteccao.md, cascata.md, ...)
 ```
 
-A numeração acima é a das chamadas em `gerar_limpador`, logo abaixo — é ela que
-vale. **Atenção:** os docstrings de `limpeza/empacotar.py` e
-`limpeza/metricas.py` trazem "Etapa 6" e "Etapa 5" **trocados** em relação à
-ordem real (empacotar roda antes de metricas, e o design doc numera
-empacotar=(5), metricas=(6)). São os docstrings que estão errados, não esta
-tabela; corrija-os na próxima tarefa que tocar nesses arquivos.
+A numeração é a das chamadas em `gerar_limpador`, logo abaixo, e os docstrings
+de módulo repetem a mesma. Se as duas divergirem, a ordem das chamadas é que
+vale.
 
 ### A ordem das etapas, sem intermediário
 
