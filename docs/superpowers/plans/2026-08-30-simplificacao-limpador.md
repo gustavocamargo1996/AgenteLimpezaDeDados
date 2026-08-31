@@ -64,7 +64,7 @@ Hoje o invariante só existe como um comando manual cuja entrada mora em `runs/`
 
 **Files:**
 - Create: `tests/fixtures/limpador_beers_congelado.py`, `tests/fixtures/beers_dirty_300.csv`, `tests/fixtures/beers_clean_300.csv`
-- Create: `tests/test_invariante.py`, `tests/conftest.py`, `pytest.ini`
+- Create: `tests/test_invariante.py`, `pytest.ini`
 - Modify: `avaliar_limpador.py` (extrair função pura de `main`)
 - Modify: `requirements.txt`
 
@@ -411,7 +411,11 @@ O arquivo tem 776 linhas, das quais 545 são código puro. Separar em quatro, e 
 
 O cabeçalho de comentário das linhas 162–247 (a introdução do bloco de refino) é raciocínio, não código: vai para `docs/DECISOES.md#loop-de-refinamento` na Task 2, não é copiado.
 
-- [ ] **Step 3b: Criar `detector_nulo()`**
+- [ ] **Step 3b: Criar `limpeza/tipos.py`**
+
+`detector_nulo()` (Step 3c) devolve um `Detector`, então os tipos precisam existir antes. São dado puro, sem dependência de módulo nenhum. Copiar o bloco completo da Task 7, Step 3 — `Coluna`, `Tabela`, `Amostra`, `Detector`, `Correcao`, `Trabalho` — para `limpeza/tipos.py`.
+
+- [ ] **Step 3c: Criar `detector_nulo()`**
 
 A espinha da Task 7 precisa de uma forma de dizer "esta coluna não é marcada" sem duplicar a construção do sentinela, que hoje aparece em dois lugares. Em `limpeza/deteccao/regra.py`:
 
@@ -484,8 +488,10 @@ git commit -m "Reestrutura poc/ em limpeza/ com subpacotes deteccao e correcao"
 ### Task 7: Os tipos e a espinha
 
 **Files:**
-- Create: `limpeza/tipos.py`, `limpeza/pipeline.py`
+- Create: `limpeza/pipeline.py`, `tests/test_pipeline.py`
 - Modify: `main.py` (reduzir a CLI)
+
+> `limpeza/tipos.py` já foi criado na Task 6, Step 3b. O Step 3 abaixo é a referência do conteúdo; se o arquivo já bate com ele, o step é uma conferência, não uma reescrita.
 
 **Interfaces:**
 
