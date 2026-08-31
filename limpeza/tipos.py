@@ -5,6 +5,7 @@ from typing import Any
 
 @dataclass
 class Coluna:
+    """Uma coluna da tabela: `sujo`/`limpo` sao pd.Series (a coluna inteira, nao o dataset)."""
     nome: str
     sujo: Any
     limpo: Any
@@ -14,6 +15,7 @@ class Coluna:
 
 @dataclass
 class Tabela:
+    """Os dois CSVs completos: `sujo`/`limpo` sao pd.DataFrame (nao pd.Series como em Coluna)."""
     sujo: Any
     limpo: Any
     nome: str
@@ -22,6 +24,7 @@ class Tabela:
 
 @dataclass
 class Amostra:
+    """O que o KMeans mostrou: `representantes` (valores distintos) e `linhas` (indices de linha, viram holdout)."""
     representantes: list[str]
     linhas: set[int]
     rotulados: list[dict]
@@ -31,6 +34,7 @@ class Amostra:
 
 @dataclass
 class Detector:
+    """Como achar o erro numa coluna."""
     codigo: str
     funcao: Any
     cadeia: str
@@ -43,6 +47,7 @@ class Detector:
 
 @dataclass
 class Correcao:
+    """Como consertar as celulas marcadas de uma coluna."""
     passos: list[dict]
     trilha: dict
     cadeia: str
@@ -50,7 +55,7 @@ class Correcao:
 
 @dataclass
 class Trabalho:
-    # Preenchido incrementalmente ao longo das etapas do pipeline.
+    """Tudo que se sabe sobre uma coluna, preenchido ao longo das etapas."""
     coluna: Coluna
     amostra: Amostra | None
     detector: Detector | None

@@ -40,7 +40,8 @@ def _passos_de(plano_correcao: dict, coluna: str) -> tuple:
     return corretor, fd
 
 
-# Corpo estatico: NAO editar comentarios/docstrings aqui dentro (comparado byte a byte pela fixture do teste).
+# Corpo estatico: NAO editar comentarios/docstrings aqui dentro -- trava por
+# tests/test_estatico_congelado.py::test_estatico_bate_com_a_fixture_congelada.
 _ESTATICO = '''
 def _mascara(df):
     """Espelho de deteccao.construir_mascara: mascara BOOL por coluna, posicional.
