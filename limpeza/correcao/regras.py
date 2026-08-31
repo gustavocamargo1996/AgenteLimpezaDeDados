@@ -51,22 +51,22 @@ raciocinio que leva do valor sujo ate ele, e generalizar isso numa regra que \
 funcione nas celulas que voce NAO viu."""
 
 
+def _formatar_item(item: dict) -> str:
+    if item.get("ambiguo"):
+        exemplos = ", ".join(f'"{e}"' for e in item.get("exemplos_limpos", [])[:4])
+        return (
+            f'  - sujo: "{item["sujo"]}" ({item["frequencia"]}x)  ->  correto: AMBIGUO -- '
+            f'este mesmo valor sujo corresponde a {item["limpos_distintos"]} valores '
+            f"corretos diferentes (ex.: {exemplos}). Nao existe mapeamento unico."
+        )
+    return (
+        f'  - sujo: "{item["sujo"]}"  ->  correto: "{item["limpo"]}"'
+        f'   ({item["frequencia"]}x na coluna)'
+    )
+
+
 def _formatar_amostra(itens: list[dict]) -> str:
-    linhas = []
-    for item in itens:
-        if item.get("ambiguo"):
-            exemplos = ", ".join(f'"{e}"' for e in item.get("exemplos_limpos", [])[:4])
-            linhas.append(
-                f'  - sujo: "{item["sujo"]}" ({item["frequencia"]}x)  ->  correto: AMBIGUO -- '
-                f'este mesmo valor sujo corresponde a {item["limpos_distintos"]} valores '
-                f"corretos diferentes (ex.: {exemplos}). Nao existe mapeamento unico."
-            )
-        else:
-            linhas.append(
-                f'  - sujo: "{item["sujo"]}"  ->  correto: "{item["limpo"]}"'
-                f'   ({item["frequencia"]}x na coluna)'
-            )
-    return "\n".join(linhas)
+    return "\n".join(_formatar_item(item) for item in itens)
 
 
 def construir_agente_especificador(modelo: str | None = None):
@@ -189,7 +189,7 @@ def traduzir(regra: RegraCorrecao, agente=None) -> dict:
             # Testa com os proprios exemplos da spec: se falha neles, nao vale soltar na coluna.
             amostras = [e.de for e in regra.exemplos] or ["12.0 oz", "", "null"]
             sandbox.testar_fumaca(funcao, amostras)
-        except sandbox.CodigoRejeitado as erro:
+        except sandbox.CodigoRejeitado as erro:  # rejeitado: guarda o motivo e tenta de novo com prompt de reparo
             rejeicoes.append(str(erro))
             mensagens = [("system", SISTEMA_CODIGO), ("human", HUMANO_CODIGO), ("human", REPARO)]
             continue

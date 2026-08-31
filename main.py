@@ -4,9 +4,10 @@ import sys
 from pathlib import Path
 
 # Windows abre o stdout em cp1252 (mojibake); isto forca utf-8 so' na impressao.
-for fluxo in (sys.stdout, sys.stderr):
-    if hasattr(fluxo, "reconfigure"):
-        fluxo.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from limpeza import config, dados, pipeline  # noqa: E402
 
@@ -61,7 +62,7 @@ def main(argv=None) -> int:
     try:
         limpador, medida = pipeline.gerar_limpador(
             caminho_sujo=args.sujo, caminho_limpo=args.limpo, colunas=colunas)
-    except dados.DadosInvalidos as exc:
+    except dados.DadosInvalidos as exc:  # erro de dados e' do usuario: mensagem curta, sem traceback
         print(f"ERRO: {exc}", file=sys.stderr)
         return 1
 

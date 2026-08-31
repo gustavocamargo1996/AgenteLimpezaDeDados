@@ -76,11 +76,8 @@ def construir_agente(modelo: str | None = None):
 
 
 def _formatar_amostra(representantes_sujos: list[str], contagem: dict) -> str:
-    linhas = []
-    for valor in representantes_sujos:
-        freq = int(contagem.get(valor, 0))
-        linhas.append(f'  - "{valor}"   ({freq}x na coluna)')
-    return "\n".join(linhas)
+    return "\n".join(
+        f'  - "{v}"   ({int(contagem.get(v, 0))}x na coluna)' for v in representantes_sujos)
 
 
 def gerar_regra_deteccao(coluna, amostra, agente=None) -> Detector:
@@ -96,18 +93,13 @@ def gerar_regra_deteccao(coluna, amostra, agente=None) -> Detector:
         }
     )
 
+    # Codigo rejeitado pelo portao sobe ate a fronteira em pipeline.py (coluna nao marcada).
     funcao = None
     if (regra.codigo or "").strip():
-        try:
-            funcao = materializar(regra.codigo.strip())
-            sandbox.testar_fumaca(
-                funcao, pd.Series(_AMOSTRAS_FUMACA), series_mode=True
-            )
-        except sandbox.CodigoRejeitado:
-            funcao = None
-
-    if funcao is None:
-        # Codigo reprovado no portao: marca zero celulas, nunca inventa deteccao.
+        funcao = materializar(regra.codigo.strip())
+        sandbox.testar_fumaca(funcao, pd.Series(_AMOSTRAS_FUMACA), series_mode=True)
+    else:
+        # Sem codigo algum: marca zero celulas, nunca inventa deteccao.
         funcao = materializar(DETECTA_NADA)
         regra.codigo = DETECTA_NADA
     return detector_de(regra, funcao)

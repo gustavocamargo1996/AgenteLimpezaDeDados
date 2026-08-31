@@ -6,14 +6,12 @@ from . import fd as fd_mod, regras
 
 def _gate_codigo(funcao, rows: list[dict]) -> bool:
     """Reprova a regra inteira se errar 1 unico rotulado. Ver docs/DECISOES.md#gates-de-100."""
+    # Excecao aqui sobe ate o catch por coluna em rodar_cascata (ja e' a fronteira certa).
     if funcao is None:
         return False
     for r in rows:
-        try:
-            saida = funcao(r["sujo"])
-            saida = "" if saida is None else str(saida)
-        except Exception:
-            return False
+        saida = funcao(r["sujo"])
+        saida = "" if saida is None else str(saida)
         if saida != r["limpo"]:
             return False
     return True

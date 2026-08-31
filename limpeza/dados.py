@@ -18,9 +18,10 @@ def nome_dataset(caminho) -> str:
 
 def carregar(caminho_sujo, caminho_limpo, colunas=None) -> Tabela:
     """Le os dois CSVs como texto literal e devolve a Tabela ja com as Colunas."""
-    for rotulo, caminho in (("sujo", caminho_sujo), ("limpo", caminho_limpo)):
-        if not Path(caminho).exists():
-            raise DadosInvalidos(f"arquivo {rotulo} nao encontrado: {caminho}")
+    if not Path(caminho_sujo).exists():
+        raise DadosInvalidos(f"arquivo sujo nao encontrado: {caminho_sujo}")
+    if not Path(caminho_limpo).exists():
+        raise DadosInvalidos(f"arquivo limpo nao encontrado: {caminho_limpo}")
 
     # keep_default_na=False: sem isso o pandas converte "N/A" em NaN e apaga
     # 1.005 erros reais de `ibu`. Ver docs/DECISOES.md#carga-literal.

@@ -83,11 +83,7 @@ def selecionar(matriz: np.ndarray, n_clusters=None, maximo=None) -> list[int]:
         if len(membros) > 1:
             escolhidos.append(int(membros[distancias.argmin()]))  # mais tipico
 
-    vistos, saida = set(), []
-    for i in escolhidos:
-        if i not in vistos:
-            vistos.add(i)
-            saida.append(i)
+    saida = list(dict.fromkeys(escolhidos))  # unico, ordem preservada
     return saida[:maximo]
 
 
@@ -119,9 +115,7 @@ def representantes(coluna: Coluna, emb=None) -> Amostra:
 
 def _rotular(coluna: Coluna, linhas: set) -> list[dict]:
     # Estas linhas sao tambem o holdout da metrica: medi-las mediria memorizacao.
-    rotulados = []
-    for idx in sorted(linhas):
+    def _linha(idx):
         sujo, limpo = coluna.sujo.at[idx], coluna.limpo.at[idx]
-        rotulados.append({"indice": int(idx), "sujo": sujo, "limpo": limpo,
-                          "eh_erro": sujo != limpo})
-    return rotulados
+        return {"indice": int(idx), "sujo": sujo, "limpo": limpo, "eh_erro": sujo != limpo}
+    return [_linha(idx) for idx in sorted(linhas)]

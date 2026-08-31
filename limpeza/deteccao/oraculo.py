@@ -1,5 +1,6 @@
 """O que perguntar ao oraculo: classificacao e amostragem do loop de refino."""
 import re
+from collections import Counter
 
 import numpy as np
 import pandas as pd
@@ -8,19 +9,16 @@ from .. import config
 
 
 def _classificar(funcao, valores: list[str]) -> list[bool]:
-    """Classifica valores distintos pela regra Series viva; qualquer falha devolve tudo False."""
+    """Classifica valores distintos pela regra Series viva; qualquer falha devolve tudo False (testado)."""
     n = len(valores)
     if funcao is None or n == 0:
         return [False] * n
     try:
         res = funcao(pd.Series(valores, dtype=object))
-    except Exception:  # noqa: BLE001 -- classificacao nao pode derrubar o loop
-        return [False] * n
-    if not isinstance(res, pd.Series) or len(res) != n:
-        return [False] * n
-    try:
+        if not isinstance(res, pd.Series) or len(res) != n:
+            return [False] * n
         return [bool(x) for x in res.fillna(False).astype(bool)]
-    except Exception:  # noqa: BLE001 -- coercao nao pode derrubar o loop
+    except Exception:  # noqa: BLE001 -- chamada OU coercao: classificacao nao pode derrubar o loop
         return [False] * n
 
 
@@ -61,12 +59,8 @@ def _selecionar_diverso(candidatos: list[str], referencia, n: int, embedder) -> 
 
 
 def _contar_chars_alnum(sujo_col) -> dict:
-    contagem: dict = {}
-    for valor in sujo_col.astype(str).str.lower():
-        for ch in set(valor):
-            if ch.isalnum():
-                contagem[ch] = contagem.get(ch, 0) + 1
-    return contagem
+    chars = (ch for v in sujo_col.astype(str).str.lower() for ch in set(v) if ch.isalnum())
+    return dict(Counter(chars))
 
 
 def _score_artefato(valor: str, char_counts: dict, usar_bonus_x: bool) -> float:
@@ -148,9 +142,9 @@ def _amostrar_oraculo(
     usados = set(usados or [])
     novos = [v for v in valores if v not in usados]
     marcas = _classificar(funcao, novos)
-    previsto_sujo, previsto_limpo = [], []
-    for v, marcado in zip(novos, marcas):
-        (previsto_sujo if marcado else previsto_limpo).append(v)
+    pares = list(zip(novos, marcas))
+    previsto_sujo = [v for v, marcado in pares if marcado]
+    previsto_limpo = [v for v, marcado in pares if not marcado]
 
     n_sujo = n // 2
     n_limpo = n - n_sujo

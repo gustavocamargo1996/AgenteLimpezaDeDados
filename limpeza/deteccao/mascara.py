@@ -15,30 +15,23 @@ def aplicar_detectores(
             continue
         try:
             res = funcao(df[coluna])
-        except Exception as exc:  # noqa: BLE001 -- deteccao nao pode derrubar o pipeline
+            if not isinstance(res, pd.Series):
+                log.append(
+                    {"coluna": coluna,
+                     "motivo": f"retorno nao-Series ({type(res).__name__})"}
+                )
+                continue
+            if len(res) != n:
+                log.append(
+                    {"coluna": coluna,
+                     "motivo": f"tamanho divergente: esperado {n}, veio {len(res)}"}
+                )
+                continue
+            marca = res.fillna(False).astype(bool).to_numpy()
+        except Exception as exc:  # noqa: BLE001 -- chamada OU coercao: deteccao nao pode derrubar o pipeline
             log.append(
                 {"coluna": coluna,
                  "motivo": f"excecao {type(exc).__name__}: {exc}"}
-            )
-            continue
-        if not isinstance(res, pd.Series):
-            log.append(
-                {"coluna": coluna,
-                 "motivo": f"retorno nao-Series ({type(res).__name__})"}
-            )
-            continue
-        if len(res) != n:
-            log.append(
-                {"coluna": coluna,
-                 "motivo": f"tamanho divergente: esperado {n}, veio {len(res)}"}
-            )
-            continue
-        try:
-            marca = res.fillna(False).astype(bool).to_numpy()
-        except Exception as exc:  # noqa: BLE001 -- coercao nao pode derrubar o pipeline
-            log.append(
-                {"coluna": coluna,
-                 "motivo": f"coercao bool falhou ({type(exc).__name__}: {exc})"}
             )
             continue
         mascara[coluna] = marca.astype(int)

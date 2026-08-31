@@ -30,13 +30,12 @@ def _renomear(codigo: str, de: str, para: str) -> str:
 
 
 def _passos_de(plano_correcao: dict, coluna: str) -> tuple:
-    corretor = None
-    fd = None
-    for passo in plano_correcao.get(coluna, []) or []:
-        if passo.get("tipo") == "codigo" and passo.get("codigo"):
-            corretor = passo["codigo"]
-        elif passo.get("tipo") == "fd":
-            fd = (passo["determinante"], passo["dependente"])
+    # No maximo um passo de cada tipo (ver cascata._passos): o primeiro que casar basta.
+    passos = plano_correcao.get(coluna, []) or []
+    corretor = next(
+        (p["codigo"] for p in passos if p.get("tipo") == "codigo" and p.get("codigo")), None)
+    fd_passo = next((p for p in passos if p.get("tipo") == "fd"), None)
+    fd = (fd_passo["determinante"], fd_passo["dependente"]) if fd_passo else None
     return corretor, fd
 
 
@@ -210,23 +209,23 @@ def escrever_limpador(
     colunas = list(colunas)
     sufixos = _sufixos_seguros(colunas)
 
-    partes: list = []
+    detector_partes: list = []
+    corretor_partes: list = []
     detectores_por_col: dict = {}
-    for col in colunas:
-        codigo = (detectores_codigo.get(col) or "").strip() or _DETECTA_NADA
-        nome = f"_detectar_{sufixos[col]}"
-        partes.append(_renomear(codigo, "detectar", nome))
-        detectores_por_col[col] = nome
-
     corretores_por_col: dict = {}
     fds_por_col: dict = {}
     coocorrencia: list = []
     for col in colunas:
+        codigo = (detectores_codigo.get(col) or "").strip() or _DETECTA_NADA
+        nome_det = f"_detectar_{sufixos[col]}"
+        detector_partes.append(_renomear(codigo, "detectar", nome_det))
+        detectores_por_col[col] = nome_det
+
         corretor, fd = _passos_de(plano_correcao, col)
         if corretor:
-            nome = f"_corrigir_{sufixos[col]}"
-            partes.append(_renomear(corretor, "corrigir", nome))
-            corretores_por_col[col] = nome
+            nome_cor = f"_corrigir_{sufixos[col]}"
+            corretor_partes.append(_renomear(corretor, "corrigir", nome_cor))
+            corretores_por_col[col] = nome_cor
         if fd is not None:
             fds_por_col[col] = fd
         if corretor and fd is not None:
@@ -257,10 +256,9 @@ def escrever_limpador(
         "",
         "",
         "# --- detectores por coluna (codigo de deteccao gerado, renomeado) ---",
-        "\n\n".join(partes[: len(colunas)]) if colunas else "",
+        "\n\n".join(detector_partes) if colunas else "",
     ]
 
-    corretor_partes = partes[len(colunas):]
     if corretor_partes:
         blocos += [
             "",

@@ -68,6 +68,7 @@ def _cascata_md(nome: str, trabalhos: list) -> str:
         "\n| Coluna | Marcadas | Codigo | FD | Nao resolvida | Soma confere |",
         "|---|---|---|---|---|---|",
     ]
+    detalhes = []  # segunda secao, montada na MESMA passagem por trabalhos
     for trabalho in trabalhos:
         t = trabalho.correcao.trilha
         c = t["contagem"]
@@ -78,25 +79,23 @@ def _cascata_md(nome: str, trabalhos: list) -> str:
             f"{c['fd']} | {c['nao_resolvida']} | {confere} |"
         )
 
-    for trabalho in trabalhos:
-        t = trabalho.correcao.trilha
-        linhas.append(f"\n---\n\n## `{trabalho.coluna.nome}`\n")
-        linhas.append(
+        detalhes.append(f"\n---\n\n## `{trabalho.coluna.nome}`\n")
+        detalhes.append(
             f"- gate camada 1 (codigo, `{t['regra_codigo_tipo']}`): "
             f"{'PASSOU' if t['gate_codigo'] else 'reprovou'}"
         )
         if t["gate_fd"] is None:
-            linhas.append("- gate camada 2 (FD): nao acionado (sem candidato por MI ou nada a escalar)")
+            detalhes.append("- gate camada 2 (FD): nao acionado (sem candidato por MI ou nada a escalar)")
         else:
             fd = t["fd"] or {}
-            linhas.append(
+            detalhes.append(
                 f"- gate camada 2 (FD `{fd.get('determinante')}` -> `{fd.get('dependente')}`): "
                 f"{'PASSOU' if t['gate_fd'] else 'reprovou (nenhuma celula alterada)'}"
             )
         if t["log"]:
-            linhas.append(f"- log ({len(t['log'])} entradas): valores nao enviados / erros registrados")
+            detalhes.append(f"- log ({len(t['log'])} entradas): valores nao enviados / erros registrados")
 
-    return "\n".join(linhas)
+    return "\n".join(linhas + detalhes)
 
 
 def _cadeias_md(nome: str, trabalhos: list) -> str:

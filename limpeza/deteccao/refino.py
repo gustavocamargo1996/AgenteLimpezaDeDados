@@ -135,7 +135,7 @@ def _tentar_update(cadeia_update, coluna: str, codigo_atual: str, feedback: str)
     try:
         funcao = materializar(codigo)
         sandbox.testar_fumaca(funcao, pd.Series(_AMOSTRAS_FUMACA), series_mode=True)
-    except sandbox.CodigoRejeitado as exc:
+    except sandbox.CodigoRejeitado as exc:  # revisao nao passa no portao: mantem a regra residente, segue pra proxima iteracao
         return None, str(exc)
     nova.codigo = codigo
     return detector_de(nova, funcao), ""

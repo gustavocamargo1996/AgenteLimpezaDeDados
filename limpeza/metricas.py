@@ -65,16 +65,13 @@ def metricas_correcao(
     sub_limpo = limpo.loc[indices]
     sub_final = corrigido_col.loc[indices]
 
-    erradas = corretas = acertos = dano = 0
-    for bruto, esperado, final in zip(sub_sujo, sub_limpo, sub_final):
-        if bruto != esperado:
-            erradas += 1
-            if final == esperado:
-                acertos += 1
-        else:
-            corretas += 1
-            if final != esperado:
-                dano += 1
+    # Vetorizado: mesma contagem que iterar celula a celula, sem o loop.
+    era_erro = sub_sujo != sub_limpo
+    era_correta = ~era_erro
+    erradas = int(era_erro.sum())
+    corretas = int(era_correta.sum())
+    acertos = int((era_erro & (sub_final == sub_limpo)).sum())
+    dano = int((era_correta & (sub_final != sub_limpo)).sum())
 
     return {
         "celulas_avaliadas": int(len(indices)),
