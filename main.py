@@ -1,22 +1,17 @@
 """Orquestrador da POC.
 
-    le o CSV -> KMeans escolhe representantes -> agente 1 especifica a regra
-    (+ cadeia de pensamento) -> agente 2 traduz para codigo -> avalia em duas
-    escalas de holdout -> escreve artefatos e imprime as cadeias.
+    le o CSV -> KMeans escolhe representantes -> deteccao intra-coluna ->
+    cascata codigo/FD corrige -> avalia contra o holdout -> escreve artefatos
+    e empacota o limpador autonomo.
 
 Uso:
-    python main.py                          # roda os dois modos e compara
-    python main.py --modo budget            # so' um modo
+    python main.py                          # gera o limpador do dataset padrao
     python main.py --colunas ounces,state   # subconjunto
     python main.py --colunas todas          # todas as colunas, sem vies de selecao
-    python main.py --reavaliar runs/2026-07-23_1133__budget   # sem gastar API
 """
 import argparse
-import json
-import re
 import sys
 from datetime import datetime
-from pathlib import Path
 
 # Windows abre o stdout em cp1252 e as cadeias saem com mojibake no terminal.
 # Os arquivos .md ja saem em utf-8; isto conserta so' a impressao.
@@ -29,16 +24,11 @@ from poc import (  # noqa: E402
     fd, gerador_codigo, identificador_regras, relatorio, sandbox,
 )
 from poc.embeddings import Embedder  # noqa: E402
-from poc.esquemas import RegraCorrecao, RegraDeteccao  # noqa: E402
+from poc.esquemas import RegraDeteccao  # noqa: E402
 
 
 def _selecionar_representantes(coluna, embedder):
-    """Selecao deterministica (KMeans random_state=0) e independente do modo.
-
-    Por ser deterministica, uma reavaliacao reproduz exatamente os mesmos
-    representantes de uma execucao anterior -- e' o que permite recalcular
-    metricas sem chamar o LLM de novo.
-    """
+    """Selecao deterministica (KMeans random_state=0) dos valores representativos."""
     matriz = embedder.codificar(coluna.valores_distintos)
     indices = amostragem.selecionar(matriz)
     primeira_ocorrencia = {
@@ -49,152 +39,30 @@ def _selecionar_representantes(coluna, embedder):
     return indices, set(valores), linhas
 
 
-def _preparar_itens(coluna, indices_repr, contagem, modo):
-    """Monta a amostra que vai ao agente 1.
+def _preparar_itens(coluna, indices_repr, contagem):
+    """Monta a amostra que vai ao agente 1, com o par sujo->limpo de cada representante.
 
-    Cuidado nao-obvio no modo budget: um mesmo valor sujo pode corresponder a
-    varios valores limpos diferentes. Em `state`, as 127 celulas vazias viram 38
-    estados distintos. Reduzir isso a moda ("vazio -> CO") ensinaria uma regra
-    falsa ao agente e ele produziria, com toda a logica do mundo, um corretor que
+    Cuidado nao-obvio: um mesmo valor sujo pode corresponder a varios valores
+    limpos diferentes. Em `state`, as 127 celulas vazias viram 38 estados
+    distintos. Reduzir isso a moda ("vazio -> CO") ensinaria uma regra falsa ao
+    agente e ele produziria, com toda a logica do mundo, um corretor que
     escreve CO em tudo. Quando o mapeamento e' ambiguo, dizemos que e' ambiguo.
     """
     itens = []
     for indice in indices_repr:
         valor = coluna.valores_distintos[indice]
         item = {"sujo": valor, "frequencia": int(contagem.get(valor, 0))}
-        if modo == "budget":
-            distintos = coluna.limpo[coluna.sujo == valor].unique().tolist()
-            item["limpo"] = distintos[0] if distintos else valor
-            item["ambiguo"] = len(distintos) > 1
-            item["limpos_distintos"] = len(distintos)
-            item["exemplos_limpos"] = distintos[:4]
+        distintos = coluna.limpo[coluna.sujo == valor].unique().tolist()
+        item["limpo"] = distintos[0] if distintos else valor
+        item["ambiguo"] = len(distintos) > 1
+        item["limpos_distintos"] = len(distintos)
+        item["exemplos_limpos"] = distintos[:4]
         itens.append(item)
     return itens
 
 
-def _avaliar(coluna, modo, funcao, valores, linhas):
-    holdout_valor, holdout_linha = dados.particionar(coluna, valores, linhas)
-    return avaliacao.avaliar(
-        coluna=coluna.nome,
-        modo=modo,
-        sujo=coluna.sujo,
-        limpo=coluna.limpo,
-        holdout_valor=holdout_valor,
-        holdout_linha=holdout_linha,
-        funcao=funcao,
-        valores_mostrados=len(valores),
-        linhas_mostradas=len(linhas),
-        erradas_na_coluna=coluna.celulas_erradas,
-    )
-
-
-def processar_coluna(coluna, modo, embedder, agente_spec, agente_cod, verboso=True):
-    indices_repr, valores, linhas = _selecionar_representantes(coluna, embedder)
-    contagem = coluna.sujo.value_counts().to_dict()
-    itens = _preparar_itens(coluna, indices_repr, contagem, modo)
-
-    if verboso:
-        print(f"  [{modo}] {coluna.nome}: {len(coluna.valores_distintos)} valores distintos, "
-              f"{len(itens)} representantes -> agente 1...", flush=True)
-
-    regra = identificador_regras.especificar(
-        coluna=coluna.nome, itens=itens, modo=modo,
-        total_linhas=coluna.total_celulas,
-        total_distintos=len(coluna.valores_distintos),
-        agente=agente_spec,
-    )
-
-    if verboso:
-        print(f"  [{modo}] {coluna.nome}: regra `{regra.transformacao.tipo}` -> agente 2...", flush=True)
-
-    traducao = gerador_codigo.traduzir(regra, agente=agente_cod)
-    resultado = _avaliar(coluna, modo, traducao["funcao"], valores, linhas)
-    return {"regra": regra, "traducao": traducao, "resultado": resultado}
-
-
 # --------------------------------------------------------------------------- #
-# Reavaliacao: recalcula metricas de uma execucao passada, sem chamar o LLM.
-# --------------------------------------------------------------------------- #
-
-_MARCADOR = re.compile(r"^# --- coluna: (.+?) ---$", re.MULTILINE)
-
-
-def carregar_codigos(pasta: Path) -> dict[str, str]:
-    """Le o codigo gerado. Prefere codigo.json; cai para o corretores.py legado.
-
-    O fallback existe porque o `corretores.py` renomeia cada funcao para
-    `corrigir_<coluna>` (senao as 5 colidiriam no mesmo arquivo), e o portao AST
-    exige o nome exato `corrigir`. Entao o .py nao volta limpo para
-    `sandbox.materializar` -- daqui o parse reverso que desfaz o rename. O
-    `codigo.json` foi criado justamente para tornar esse caminho desnecessario;
-    ele so' serve para execucoes anteriores a esse arquivo existir.
-    """
-    arquivo = pasta / "codigo.json"
-    if arquivo.exists():
-        return {k: v["codigo"] for k, v in json.loads(arquivo.read_text(encoding="utf-8")).items()}
-
-    texto = (pasta / "corretores.py").read_text(encoding="utf-8")
-    marcas = list(_MARCADOR.finditer(texto))
-    codigos = {}
-    for i, marca in enumerate(marcas):
-        nome = marca.group(1)
-        fim = marcas[i + 1].start() if i + 1 < len(marcas) else len(texto)
-        trecho = texto[marca.end() : fim]
-        inicio = trecho.find(f"def corrigir_{nome}(")
-        if inicio == -1:
-            continue
-        codigos[nome] = trecho[inicio:].replace(f"def corrigir_{nome}(", "def corrigir(", 1).strip()
-    return codigos
-
-
-def reavaliar(pasta: Path, sujo, limpo, embedder) -> list[dict]:
-    regras = [RegraCorrecao(**r) for r in json.loads((pasta / "regras.json").read_text(encoding="utf-8"))]
-    codigos = carregar_codigos(pasta)
-    modo = pasta.name.split("__")[-1]
-    itens = []
-    for regra in regras:
-        coluna = dados.montar_coluna(sujo, limpo, regra.coluna)
-        _, valores, linhas = _selecionar_representantes(coluna, embedder)
-        codigo = codigos.get(regra.coluna, "")
-        try:
-            funcao = sandbox.materializar(codigo) if codigo else None
-        except sandbox.CodigoRejeitado:
-            funcao = None
-        resultado = _avaliar(coluna, modo, funcao, valores, linhas)
-        itens.append({
-            "regra": regra,
-            "traducao": {"codigo": codigo, "nota": "(reavaliado)", "tentativas": 0, "rejeicoes": []},
-            "resultado": resultado,
-        })
-    return itens
-
-
-def imprimir(por_modo: dict[str, list[dict]]) -> None:
-    print("=" * 78)
-    for modo, itens in por_modo.items():
-        print(f"\n### MODO {modo.upper()}\n")
-        for item in itens:
-            regra, res = item["regra"], item["resultado"]
-            g, c = res.generalizacao, res.cobertura
-            fmt = lambda v: "n/d" if v is None else f"{v:.1%}"  # noqa: E731
-            print(f"--- {regra.coluna} | erro={'sim' if regra.erro_detectado else 'NAO'} "
-                  f"| {regra.transformacao.tipo}")
-            print(f"      generalizacao: acerto={fmt(g.taxa_acerto):>6s} dano={fmt(g.taxa_dano):>6s}"
-                  f"   ({g.erradas} erradas / {g.corretas} corretas em {g.celulas} celulas)")
-            print(f"      cobertura    : acerto={fmt(c.taxa_acerto):>6s} dano={fmt(c.taxa_dano):>6s}"
-                  f"   ({c.erradas} erradas / {c.corretas} corretas em {c.celulas} celulas)")
-            if res.excecoes:
-                print(f"      !! {res.excecoes} excecoes lancadas pelo codigo gerado "
-                      f"(valor devolvido intacto nesses casos)")
-            if g.observacao:
-                print(f"      !! {g.observacao}")
-            if res.observacao:
-                print(f"      !! {res.observacao}")
-            print(f"      limites: {regra.cadeia_de_pensamento.limites_da_regra[:150]}\n")
-
-
-# --------------------------------------------------------------------------- #
-# Modo end-to-end (--e2e): deteccao intra-coluna -> cascata -> avaliacao.
+# Deteccao intra-coluna -> cascata de correcao -> avaliacao.
 # --------------------------------------------------------------------------- #
 
 
@@ -289,7 +157,7 @@ def rodar_e2e(nomes, sujo, limpo, embedder, args) -> int:
                 print(f"  [e2e] {nome}: refino FALHOU ({type(exc).__name__}) "
                       "-> mantem a regra de 1-passe", flush=True)
 
-        itens = _preparar_itens(coluna, indices_repr, contagem, "budget")
+        itens = _preparar_itens(coluna, indices_repr, contagem)
         rows, holdout = dados.montar_rotulados(coluna, linhas)
         contexto_por_coluna[nome] = {
             "rotulados": {
@@ -412,25 +280,20 @@ def rodar_e2e(nomes, sujo, limpo, embedder, args) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="POC: cadeias de pensamento para regras de correcao")
-    ap.add_argument("--modo", choices=["blind", "budget", "ambos"], default="ambos")
+    ap = argparse.ArgumentParser(description="POC: geracao de limpador autonomo por dataset")
     ap.add_argument("--dataset", default=config.DATASET)
     ap.add_argument("--colunas", default=",".join(config.COLUNAS_PADRAO),
                     help="lista separada por virgula, ou 'todas'")
     ap.add_argument("--modelo", default=config.MODELO_LLM)
-    ap.add_argument("--reavaliar", metavar="PASTA", default=None,
-                    help="recalcula metricas de uma execucao passada, sem chamar o LLM")
-    ap.add_argument("--e2e", action="store_true",
-                    help="modo end-to-end: deteccao intra-coluna + cascata de correcao")
     ap.add_argument("--sufixo", default=None,
                     help="fatia do dataset: '300' usa {nome}_dirty_300.csv / _clean_300.csv")
     ap.add_argument("--iteracoes-deteccao", type=int, default=config.ITERACOES_DETECCAO,
                     dest="iteracoes_deteccao",
-                    help="(--e2e) iteracoes de refinamento da deteccao com oraculo. "
+                    help="iteracoes de refinamento da deteccao com oraculo. "
                          "1 (default) = 1-passe, sem loop; N>1 = active learning")
     ap.add_argument("--amostras-iter", type=int, default=config.AMOSTRAS_POR_ITERACAO,
                     dest="amostras_iter",
-                    help="(--e2e) valores distintos que o oraculo rotula por iteracao "
+                    help="valores distintos que o oraculo rotula por iteracao "
                          "(metade previsto-sujo, metade previsto-limpo)")
     args = ap.parse_args()
 
@@ -446,23 +309,6 @@ def main() -> int:
     sujo, limpo = dados.carregar()
     embedder = Embedder()
 
-    if args.reavaliar:
-        pastas = [Path(p) for p in args.reavaliar.split(",")]
-        por_modo = {}
-        for pasta in pastas:
-            if not (pasta / "regras.json").exists():
-                print(f"ERRO: {pasta}/regras.json nao existe", file=sys.stderr)
-                return 1
-            itens = reavaliar(pasta, sujo, limpo, embedder)
-            modo = pasta.name.split("__")[-1]
-            relatorio.escrever(pasta, modo, itens)
-            por_modo[modo] = itens
-            print(f"  reavaliado (sem API): {pasta}")
-        if len(por_modo) > 1:
-            print(f"  comparativo em {relatorio.comparativo(pastas[0].parent, por_modo)}")
-        imprimir(por_modo)
-        return 0
-
     if args.colunas.strip().lower() == "todas":
         nomes = [c for c in sujo.columns if c.lower() != "index"]
     else:
@@ -472,35 +318,7 @@ def main() -> int:
         print(f"ERRO: coluna(s) inexistente(s): {faltando}", file=sys.stderr)
         return 1
 
-    if args.e2e:
-        return rodar_e2e(nomes, sujo, limpo, embedder, args)
-
-    modos = list(config.MODOS) if args.modo == "ambos" else [args.modo]
-    print(f"dataset={args.dataset} | {len(sujo)} linhas | colunas={nomes} | modos={modos}")
-    print(f"modelo={config.MODELO_LLM} | ~{len(nomes) * len(modos) * 2} chamadas de LLM\n")
-
-    agente_spec = identificador_regras.construir_agente(config.MODELO_LLM)
-    agente_cod = gerador_codigo.construir_agente(config.MODELO_LLM)
-
-    carimbo = datetime.now().strftime("%Y-%m-%d_%H%M")
-    por_modo, pastas = {}, []
-
-    for modo in modos:
-        itens_modo = []
-        for nome in nomes:
-            coluna = dados.montar_coluna(sujo, limpo, nome)
-            itens_modo.append(processar_coluna(coluna, modo, embedder, agente_spec, agente_cod))
-        pasta = relatorio.criar_pasta(modo, carimbo)
-        relatorio.escrever(pasta, modo, itens_modo)
-        por_modo[modo] = itens_modo
-        pastas.append(pasta)
-        print(f"\n  artefatos de `{modo}` em {pasta}\n")
-
-    if len(por_modo) > 1:
-        print(f"  comparativo em {relatorio.comparativo(pastas[0].parent, por_modo)}\n")
-
-    imprimir(por_modo)
-    return 0
+    return rodar_e2e(nomes, sujo, limpo, embedder, args)
 
 
 if __name__ == "__main__":

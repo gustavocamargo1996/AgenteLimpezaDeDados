@@ -16,7 +16,7 @@ from . import config
 class Coluna:
     """Uma coluna do dataset: valores sujos, limpos e o conjunto de distintos.
 
-    Nao guarda particao -- quem fatia amostra e holdout e' `particionar()`, que
+    Nao guarda particao -- quem fatia o holdout e' `montar_rotulados()`, que
     recebe esta Coluna e devolve os indices. O objeto e' so' a coluna inteira.
     """
 
@@ -66,7 +66,7 @@ def montar_coluna(sujo: pd.DataFrame, limpo: pd.DataFrame, nome: str) -> Coluna:
 def montar_rotulados(
     col: Coluna, linhas_mostradas: set[int]
 ) -> tuple[list[dict], pd.Index]:
-    """Orcamento de rotulagem por coluna, para o modo --e2e.
+    """Orcamento de rotulagem por coluna, usado na geracao do limpador.
 
     Recebe as linhas efetivamente exibidas (primeira ocorrencia de cada
     representante) e devolve, para cada uma, o par sujo->limpo e se e' erro. Usar
@@ -86,21 +86,3 @@ def montar_rotulados(
         )
     holdout = pd.Index(sorted(int(i) for i in linhas_mostradas))
     return rows, holdout
-
-
-def particionar(
-    col: Coluna, valores_mostrados: set[str], linhas_mostradas: set[int]
-) -> tuple[pd.Index, pd.Index]:
-    """Devolve (holdout_por_valor, holdout_por_linha).
-
-    por VALOR  -- linhas cujo valor sujo o agente nunca viu. Mede generalizacao.
-                  Pode vir vazio quando uma classe de erro inteira e' um unico
-                  valor, e' esse o preco de ser estrito.
-    por LINHA  -- tudo menos as linhas efetivamente exibidas. Mede se a regra se
-                  aplica ao volume. Sempre populado.
-
-    O primeiro esta contido no segundo.
-    """
-    por_valor = col.sujo[~col.sujo.isin(valores_mostrados)].index
-    por_linha = col.sujo.index.difference(pd.Index(sorted(linhas_mostradas)))
-    return por_valor, por_linha

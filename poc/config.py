@@ -36,10 +36,10 @@ MAX_REPRESENTANTES = 12
 # --- Geracao de codigo ---
 MAX_TENTATIVAS_CODIGO = 3
 
-# --- Loop de refinamento da deteccao (--e2e --iteracoes-deteccao N) ---
+# --- Loop de refinamento da deteccao (--iteracoes-deteccao N) ---
 # Default 1 = deteccao de 1 passe (comportamento atual, SEM loop). N>1 ativa o
 # active learning com oraculo (clean) que refina `detectar(valor)` iteracao a
-# iteracao, para quebrar o blind spot da corrupcao universal (ounces/abv/city).
+# iteracao, para quebrar o ponto cego da corrupcao universal (ounces/abv/city).
 # AMOSTRAS_POR_ITERACAO = quantos valores distintos o oraculo rotula por iteracao
 # (metade previsto-sujo, metade previsto-limpo).
 ITERACOES_DETECCAO = 1
@@ -76,13 +76,6 @@ def caminhos_dataset(dataset: str, sufixo: str | None = None) -> tuple[Path, Pat
     marca = f"_{sufixo}" if sufixo else ""
     return base / f"{dataset}_dirty{marca}.csv", base / f"{dataset}_clean{marca}.csv"
 
-# Colunas processadas por default.
-# ATENCAO (vies declarado): estas sao exatamente as 5 colunas que sabemos ter
-# erro no beers. Restringir a elas vaza um pouco de gabarito para o modo
-# 'blind' -- estamos dizendo ao agente onde procurar. Para rodar sem esse
-# vies, use --colunas todas, e o agente tera que decidir sozinho, coluna a
-# coluna, se ha erro. No beers isso da' 10 colunas (as 11 menos `index`, que o
-# main.py descarta): estas 5 mais as 5 limpas.
+# Colunas processadas por default: as 5 que sabemos ter erro no beers (vies
+# declarado). Use --colunas todas para deixar o pipeline decidir coluna a coluna.
 COLUNAS_PADRAO = ["ounces", "ibu", "abv", "city", "state"]
-
-MODOS = ("blind", "budget")

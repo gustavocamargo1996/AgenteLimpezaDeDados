@@ -45,7 +45,6 @@ def _camada_codigo(coluna, rotulados, agentes):
     regra = identificador_regras.especificar(
         coluna=coluna,
         itens=rotulados["itens"],
-        modo="budget",
         total_linhas=rotulados["total_linhas"],
         total_distintos=rotulados["total_distintos"],
         agente=agentes.get("especificador"),

@@ -11,129 +11,6 @@ def criar_pasta(modo: str, carimbo: str) -> Path:
     return pasta
 
 
-def _linha_medida(m) -> str:
-    acerto = "n/d" if m.taxa_acerto is None else f"{m.taxa_acerto:.1%} ({m.acertos}/{m.erradas})"
-    dano = "n/d" if m.taxa_dano is None else f"{m.taxa_dano:.1%} ({m.dano}/{m.corretas})"
-    return f"| {m.escopo} | {m.celulas} | {acerto} | {dano} |"
-
-
-def _bloco_cadeia(regra, resultado) -> str:
-    c = regra.cadeia_de_pensamento
-    t = regra.transformacao
-    aviso = ""
-    if resultado.excecoes:
-        aviso += (
-            f"\n> **{resultado.excecoes} excecoes lancadas pelo codigo gerado** — nesses "
-            "casos o valor foi devolvido intacto, entao contam como nao-corrigido e nao "
-            "como dano.\n"
-        )
-    if resultado.generalizacao.observacao:
-        aviso += f"\n> **{resultado.generalizacao.observacao}**\n"
-    if resultado.observacao:
-        aviso += f"\n> **{resultado.observacao}**\n"
-
-    return f"""## Coluna `{regra.coluna}`
-
-**Erro detectado:** {"sim" if regra.erro_detectado else "nao"} &nbsp;|&nbsp; \
-**Tipo:** `{regra.tipo_erro}` &nbsp;|&nbsp; \
-**Transformacao:** `{t.tipo}` &nbsp;|&nbsp; \
-**Confianca declarada:** {regra.confianca:.2f}
-
-| escopo | celulas | acerto | dano |
-|---|---|---|---|
-{_linha_medida(resultado.generalizacao)}
-{_linha_medida(resultado.cobertura)}
-
-`generalizacao` = so' valores que o agente nunca viu &nbsp;|&nbsp; \
-`cobertura` = coluna inteira menos as {resultado.linhas_mostradas} linhas exibidas
-{aviso}
-
-### Cadeia de pensamento
-
-**1. Observacao da amostra**
-{c.observacao_da_amostra}
-
-**2. Identificacao do padrao**
-{c.identificacao_do_padrao}
-
-**3. Formulacao da regra**
-{c.formulacao_da_regra}
-
-**4. Limites da regra**
-{c.limites_da_regra}
-
-### Regra especificada
-{regra.descricao_padrao}
-
-- condicao de aplicacao: `{regra.condicao_regex or "(nenhuma)"}`
-- transformacao: `{t.tipo}` -> padrao=`{t.padrao}` substituicao=`{t.substituicao}` \
-mapa=`{"sim" if t.mapa else "nao"}` valor=`{t.valor}`
-
----
-"""
-
-
-def escrever(pasta: Path, modo: str, itens: list[dict]) -> None:
-    """`itens` = [{regra, traducao, resultado}, ...] na ordem das colunas."""
-    cabecalho = (
-        f"# Cadeias de pensamento -- modo `{modo}`\n\n"
-        f"Dataset `{config.DATASET}` | modelo `{config.MODELO_LLM}` | "
-        f"{len(itens)} colunas\n\n"
-        + (
-            "Modo **blind**: o agente viu apenas valores sujos e teve que inferir "
-            "o defeito sozinho.\n\n"
-            if modo == "blind"
-            else "Modo **budget**: o agente viu os pares sujo->correto das celulas "
-            "representativas.\n\n"
-        )
-        + "---\n\n"
-    )
-    corpo = "".join(_bloco_cadeia(i["regra"], i["resultado"]) for i in itens)
-    (pasta / "cadeias.md").write_text(cabecalho + corpo, encoding="utf-8")
-
-    (pasta / "regras.json").write_text(
-        json.dumps([i["regra"].model_dump() for i in itens], indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-
-    (pasta / "metricas.json").write_text(
-        json.dumps([i["resultado"].dict() for i in itens], indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-
-    # codigo.json existe para permitir `main.py --reavaliar` sem gastar API:
-    # o corretores.py renomeia as funcoes e nao volta limpo para materializar.
-    (pasta / "codigo.json").write_text(
-        json.dumps(
-            {
-                i["regra"].coluna: {
-                    "codigo": i["traducao"]["codigo"],
-                    "nota": i["traducao"]["nota"],
-                    "tentativas": i["traducao"]["tentativas"],
-                    "rejeicoes": i["traducao"]["rejeicoes"],
-                }
-                for i in itens
-            },
-            indent=2,
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-
-    partes = [f'"""Corretores gerados -- modo {modo}. Nao editar a mao."""\n']
-    for i in itens:
-        partes.append(
-            f"\n# --- coluna: {i['regra'].coluna} ---\n"
-            f"# nota do tradutor: {i['traducao']['nota']}\n"
-            f"# tentativas: {i['traducao']['tentativas']}"
-            + (f" | rejeicoes: {i['traducao']['rejeicoes']}" if i["traducao"]["rejeicoes"] else "")
-            + "\n"
-            + i["traducao"]["codigo"].replace("def corrigir(", f"def corrigir_{i['regra'].coluna}(")
-            + "\n"
-        )
-    (pasta / "corretores.py").write_text("\n".join(partes), encoding="utf-8")
-
-
 def _fmt_pct(v) -> str:
     return "n/d" if v is None else f"{v:.1%}"
 
@@ -172,7 +49,7 @@ def _bloco_historico_deteccao(historico: list, orcamento) -> str:
 
 
 def escrever_e2e(pasta: Path, run: dict) -> None:
-    """Artefatos do modo --e2e.
+    """Artefatos da geracao do limpador.
 
     `run` traz: dataset, modelo, sufixo, colunas, mascara (DataFrame), corrigido
     (DataFrame final), deteccao_metricas, correcao_metricas, trilhas,
@@ -261,43 +138,3 @@ def escrever_e2e(pasta: Path, run: dict) -> None:
                 historico_det.get(nome, []), orcamento_det.get(nome)))
 
     (pasta / "cadeias_deteccao.md").write_text("\n".join(partes), encoding="utf-8")
-
-
-def comparativo(pasta_saida: Path, por_modo: dict[str, list[dict]]) -> Path:
-    """Mesma coluna, os dois modos lado a lado -- e' aqui que a POC entrega."""
-    linhas = ["# Comparativo `blind` vs `budget`\n"]
-
-    linhas.append(
-        "\n| Coluna | Modo | Erro | Transformacao | Acerto (geral.) | Dano (geral.) "
-        "| Acerto (cobert.) | Dano (cobert.) |"
-    )
-    linhas.append("|---|---|---|---|---|---|---|---|")
-    pct = lambda v: "n/d" if v is None else f"{v:.1%}"  # noqa: E731
-    colunas = [i["regra"].coluna for i in next(iter(por_modo.values()))]
-    for nome in colunas:
-        for modo, itens in por_modo.items():
-            item = next((x for x in itens if x["regra"].coluna == nome), None)
-            if not item:
-                continue
-            r, res = item["regra"], item["resultado"]
-            g, c = res.generalizacao, res.cobertura
-            linhas.append(
-                f"| `{nome}` | {modo} | {'sim' if r.erro_detectado else 'NAO'} | "
-                f"`{r.transformacao.tipo}` | {pct(g.taxa_acerto)} | {pct(g.taxa_dano)} "
-                f"| {pct(c.taxa_acerto)} | {pct(c.taxa_dano)} |"
-            )
-
-    for nome in colunas:
-        linhas.append(f"\n---\n\n## `{nome}`\n")
-        for modo, itens in por_modo.items():
-            item = next((x for x in itens if x["regra"].coluna == nome), None)
-            if not item:
-                continue
-            c = item["regra"].cadeia_de_pensamento
-            linhas.append(f"### modo `{modo}`\n")
-            linhas.append(f"**Padrao identificado:** {c.identificacao_do_padrao}\n")
-            linhas.append(f"**Limites declarados:** {c.limites_da_regra}\n")
-
-    destino = pasta_saida / "comparativo.md"
-    destino.write_text("\n".join(linhas), encoding="utf-8")
-    return destino

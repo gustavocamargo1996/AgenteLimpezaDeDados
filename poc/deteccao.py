@@ -161,7 +161,7 @@ def gerar_regra_deteccao(
 
 # --------------------------------------------------------------------------- #
 # Loop de refinamento (--e2e --iteracoes-deteccao N>1): active learning com
-# oraculo (clean). Quebra o blind spot do 1-passe onde a corrupcao e' universal
+# oraculo (clean). Quebra o ponto cego do 1-passe onde a corrupcao e' universal
 # (ounces/abv/city dao F1=0 porque a forma corrompida vira a norma da coluna).
 # O 1-passe (N=1) NAO entra aqui -- este bloco so' roda quando iteracoes>1.
 # --------------------------------------------------------------------------- #

@@ -2,13 +2,9 @@
 
 Recebe os representantes escolhidos pelo KMeans e devolve, numa unica chamada,
 a cadeia de pensamento E o JSON da regra. Os dois nascem juntos de proposito:
-a cadeia e' o caminho ate a spec, nao uma justificativa escrita depois.
-
-Modos:
-  blind  -- ve so os valores sujos. Tem que inferir o que esta errado.
-  budget -- ve os pares sujo->limpo das representantes (orcamento de rotulagem
-            do ZeroDC). Sabe a resposta e reconstroi o caminho ate ela, que e'
-            o mecanismo do Auto-CoT original.
+a cadeia e' o caminho ate a spec, nao uma justificativa escrita depois. Ve os
+pares sujo->limpo das representantes (orcamento de rotulagem do ZeroDC) e
+reconstroi o caminho ate a resposta, que e' o mecanismo do Auto-CoT original.
 """
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
@@ -46,17 +42,6 @@ DISCIPLINA (o erro caro aqui e' regra ampla demais, nao regra ausente):
 
 Escreva a cadeia de pensamento em portugues do Brasil."""
 
-HUMANO_BLIND = """Coluna: `{coluna}`
-Tabela: {total_linhas} linhas, {total_distintos} valores distintos nesta coluna.
-
-Voce NAO tem acesso ao valor correto. Estes sao os valores representativos, \
-escolhidos por agrupamento semantico (os mais atipicos e os mais tipicos de cada \
-grupo), com a frequencia de cada um na coluna inteira:
-
-{amostra}
-
-Decida se ha corrupcao e, se houver, especifique a regra."""
-
 HUMANO_BUDGET = """Coluna: `{coluna}`
 Tabela: {total_linhas} linhas, {total_distintos} valores distintos nesta coluna.
 
@@ -71,12 +56,9 @@ raciocinio que leva do valor sujo ate ele, e generalizar isso numa regra que \
 funcione nas celulas que voce NAO viu."""
 
 
-def _formatar_amostra(itens: list[dict], modo: str) -> str:
+def _formatar_amostra(itens: list[dict]) -> str:
     linhas = []
     for item in itens:
-        if modo != "budget":
-            linhas.append(f'  - "{item["sujo"]}"   ({item["frequencia"]}x na coluna)')
-            continue
         if item.get("ambiguo"):
             exemplos = ", ".join(f'"{e}"' for e in item.get("exemplos_limpos", [])[:4])
             linhas.append(
@@ -105,19 +87,17 @@ def construir_agente(modelo: str | None = None):
 def especificar(
     coluna: str,
     itens: list[dict],
-    modo: str,
     total_linhas: int,
     total_distintos: int,
     agente=None,
 ) -> RegraCorrecao:
     agente = agente or construir_agente()
-    humano = HUMANO_BUDGET if modo == "budget" else HUMANO_BLIND
-    prompt = ChatPromptTemplate.from_messages([("system", SISTEMA), ("human", humano)])
+    prompt = ChatPromptTemplate.from_messages([("system", SISTEMA), ("human", HUMANO_BUDGET)])
     cadeia = prompt | agente
     regra: RegraCorrecao = cadeia.invoke(
         {
             "coluna": coluna,
-            "amostra": _formatar_amostra(itens, modo),
+            "amostra": _formatar_amostra(itens),
             "total_linhas": total_linhas,
             "total_distintos": total_distintos,
         }
