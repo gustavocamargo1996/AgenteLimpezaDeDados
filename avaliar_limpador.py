@@ -59,6 +59,39 @@ def f1_reparo(sujo: pd.Series, corrigido: pd.Series, limpo: pd.Series) -> dict:
             "recall": round(r, 4), "f1": round(f1, 4)}
 
 
+def avaliar(caminho_limpador, caminho_sujo, caminho_limpo) -> dict:
+    """Aplica o limpador ao sujo e mede o F1 de reparo por coluna e no total."""
+    sujo = pd.read_csv(caminho_sujo, **LER)
+    limpo = pd.read_csv(caminho_limpo, **LER)
+    corrigido, flags = carregar_limpador(str(caminho_limpador)).aplicar(sujo)
+
+    colunas, tp = {}, 0
+    n_erro = n_mud = n_flag = 0
+    for col in sujo.columns:
+        if col not in corrigido.columns:
+            continue
+        m = f1_reparo(sujo[col], corrigido[col], limpo[col])
+        m["flags"] = int(flags[col].sum()) if col in flags.columns else 0
+        n_flag += m["flags"]
+        colunas[col] = m
+        if m["mensuravel"]:
+            tp += m["tp"]
+            n_erro += m["erros"]
+            n_mud += m["mudancas"]
+
+    p = tp / n_mud if n_mud else None
+    r = tp / n_erro if n_erro else 0.0
+    f1 = 2 * p * r / (p + r) if (p and (p + r)) else 0.0
+    return {
+        "colunas": colunas,
+        "total": {
+            "erros": n_erro, "mudancas": n_mud, "tp": tp, "flags": n_flag,
+            "precisao": round(p, 4) if p is not None else None,
+            "recall": round(r, 4), "f1": round(f1, 4),
+        },
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="F1 de reparo de um limpador gerado")
     ap.add_argument("--limpador", required=True)
@@ -67,42 +100,28 @@ def main() -> int:
     args = ap.parse_args()
 
     d_sujo, d_limpo = caminhos(args.dataset, args.sufixo)
-    sujo = pd.read_csv(d_sujo, **LER)
-    limpo = pd.read_csv(d_limpo, **LER)
-    limp = carregar_limpador(args.limpador)
-
-    corrigido, flags = limp.aplicar(sujo)
+    resultado = avaliar(args.limpador, d_sujo, d_limpo)
+    colunas, total = resultado["colunas"], resultado["total"]
 
     print(f"limpador: {Path(args.limpador).name}")
-    print(f"dataset:  {args.dataset}{'  sufixo=' + args.sufixo if args.sufixo else ''} "
-          f"({len(sujo)} linhas)\n")
+    print(f"dataset:  {args.dataset}{'  sufixo=' + args.sufixo if args.sufixo else ''}\n")
     print(f"{'coluna':16s}| {'erros':>6s} | {'mudou':>6s} | {'TP':>5s} | "
           f"{'precisao':>8s} | {'recall':>6s} | {'F1':>6s} | flags")
     print("-" * 82)
 
-    total_tp = total_erro = total_mud = total_flag = 0
-    for col in sujo.columns:
-        if col not in corrigido.columns:
-            continue
-        m = f1_reparo(sujo[col], corrigido[col], limpo[col])
-        nflag = int(flags[col].sum()) if col in flags.columns else 0
-        total_flag += nflag
+    for col, m in colunas.items():
         if m["mensuravel"]:
-            total_tp += m["tp"]; total_erro += m["erros"]; total_mud += m["mudancas"]
             print(f"{col:16s}| {m['erros']:6d} | {m['mudancas']:6d} | {m['tp']:5d} | "
                   f"{_pct(m['precisao']):>8s} | {_pct(m['recall']):>6s} | "
-                  f"{_pct(m['f1']):>6s} | {nflag}")
+                  f"{_pct(m['f1']):>6s} | {m['flags']}")
         else:
             print(f"{col:16s}|      0 | {m['mudancas']:6d} |     - |      n/d |    n/d |"
-                  f"    n/d | {nflag}   (sem erro real)")
+                  f"    n/d | {m['flags']}   (sem erro real)")
 
-    P = total_tp / total_mud if total_mud else None
-    R = total_tp / total_erro if total_erro else 0.0
-    F1 = 2 * P * R / (P + R) if (P and (P + R)) else 0.0
     print("-" * 82)
-    print(f"{'TOTAL':16s}| {total_erro:6d} | {total_mud:6d} | {total_tp:5d} | "
-          f"{_pct(round(P,4) if P else None):>8s} | {_pct(round(R,4)):>6s} | "
-          f"{_pct(round(F1,4)):>6s} | {total_flag}")
+    print(f"{'TOTAL':16s}| {total['erros']:6d} | {total['mudancas']:6d} | {total['tp']:5d} | "
+          f"{_pct(total['precisao']):>8s} | {_pct(total['recall']):>6s} | "
+          f"{_pct(total['f1']):>6s} | {total['flags']}")
     return 0
 
 
