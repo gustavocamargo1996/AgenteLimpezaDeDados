@@ -57,13 +57,13 @@ def test_gerar_limpador_compila_importa_e_aplica_codigo_e_fd():
 
 
 def test_fd_duplo_filtro_moda_exclui_o_dependente_marcado():
+    """DUPLO-FILTRO da FD: a moda exclui as celulas MARCADAS do proprio dependente."""
     detectores = {"state": "def detectar(col):\n    return col.eq('')\n"}
     plano = {"state": [{"tipo": "fd", "determinante": "brewery", "dependente": "state"}]}
     mod, _ = _gerar_e_importar("limpador_duplo", detectores, plano, ["state"])
 
-    # brewery unica 'A'. state: 3 vazios MARCADOS + 2 'CA' limpos. SEM o filtro do
-    # dependente a moda do grupo seria '' (3 vs 2) e nada seria corrigido; COM o
-    # duplo-filtro o pool e' ['CA','CA'] -> 'CA'.
+    # brewery unica 'A': state tem 3 vazios MARCADOS + 2 'CA' limpos; sem o filtro
+    # a moda seria '' (3 vs 2), com o duplo-filtro o pool vira ['CA','CA'] -> 'CA'.
     df = pd.DataFrame({
         "brewery": ["A", "A", "A", "A", "A"],
         "state":   ["", "", "", "CA", "CA"],
@@ -119,9 +119,8 @@ def test_fd_le_o_df_de_entrada_nao_a_copia_ja_corrigida():
         "state": ["", "MA", "MA", "MA"],
     })
     corrigido, flags = mod.aplicar(df)
-    # city[0] corrigida -> 'Boston'. Se a FD lesse a copia (city ja 'Boston'), o
-    # pool seria idx1-3 -> moda 'MA' -> bug. Lendo o df ORIGINAL ('Boston MA'),
-    # nenhuma linha nao-marcada bate -> pool vazio -> state[0] fica FLAG.
+    # se a FD lesse a copia (city ja 'Boston'), o pool seria idx1-3 -> moda 'MA'
+    # (bug); lendo o df ORIGINAL ('Boston MA'), pool vazio -> state[0] fica FLAG.
     assert corrigido["city"].iloc[0] == "Boston"
     assert corrigido["state"].iloc[0] == "" and bool(flags["state"].iloc[0]) is True
 
