@@ -33,27 +33,34 @@ def gerar_limpador(caminho_sujo=None, caminho_limpo=None, colunas=None,
 
 
 def _processar_coluna(coluna: Coluna, agentes: dict) -> Trabalho:
-    """Amostra, detecta e refina uma coluna. Falha vira detector nulo."""
-    # Unica fronteira de resiliencia do run: uma coluna que quebra sai sem
-    # marcacao, e as demais seguem.
+    """Amostra, detecta e refina uma coluna. Aqui mora toda a resiliencia do run."""
+    # Duas politicas: sem regra de 1-passe a coluna sai sem marcacao; com ela,
+    # um refino que quebra devolve a regra de 1-passe, que ja passou no portao.
     amostra = amostragem.representantes(coluna)
     print(f"  {coluna.nome}: deteccao a partir de "
           f"{len(amostra.representantes)} representantes sujos...", flush=True)
+
     try:
         detector = deteccao.gerar_regra_deteccao(coluna, amostra, agentes["deteccao"])
-        if detector.codigo != deteccao.DETECTA_NADA:
-            print(f"  {coluna.nome}: refinando por "
-                  f"{config.ITERACOES_DETECCAO} iteracoes com oraculo...", flush=True)
+    except Exception as exc:  # noqa: BLE001 -- sem regra: a coluna nao e' marcada
+        print(f"  {coluna.nome}: deteccao falhou ({type(exc).__name__}) "
+              "-> coluna nao marcada", flush=True)
+        return Trabalho(coluna=coluna, amostra=amostra,
+                        detector=deteccao.detector_nulo(
+                            f"deteccao falhou ({type(exc).__name__}); "
+                            "coluna nao marcada"))
+
+    if detector.codigo != deteccao.DETECTA_NADA:
+        print(f"  {coluna.nome}: refinando por "
+              f"{config.ITERACOES_DETECCAO} iteracoes com oraculo...", flush=True)
+        try:
             detector = deteccao.refinar_regra_deteccao(
                 detector, coluna, agentes["deteccao"]
             )
             _anunciar_oraculo(coluna, detector)
-    except Exception as exc:  # noqa: BLE001 -- 1 coluna ruim nao derruba o run
-        print(f"  {coluna.nome}: deteccao falhou ({type(exc).__name__}) "
-              "-> coluna nao marcada", flush=True)
-        detector = deteccao.detector_nulo(
-            f"deteccao falhou ({type(exc).__name__}); coluna nao marcada"
-        )
+        except Exception as exc:  # noqa: BLE001 -- refino quebrou: fica o 1-passe
+            print(f"  {coluna.nome}: refino falhou ({type(exc).__name__}) "
+                  "-> mantem a regra de 1-passe", flush=True)
     return Trabalho(coluna=coluna, amostra=amostra, detector=detector)
 
 

@@ -5,6 +5,10 @@ from . import config
 from .tipos import Coluna, Tabela
 
 
+class DadosInvalidos(ValueError):
+    """Dataset que nao da' para processar: CSVs desalinhados ou coluna inexistente."""
+
+
 def carregar(caminho_sujo=None, caminho_limpo=None, colunas=None) -> Tabela:
     """Le os dois CSVs como texto literal e devolve a Tabela ja com as Colunas."""
     # keep_default_na=False mantem "N/A", "NA", "null", "-" como o texto que sao:
@@ -13,14 +17,18 @@ def carregar(caminho_sujo=None, caminho_limpo=None, colunas=None) -> Tabela:
     sujo = pd.read_csv(caminho_sujo or config.CSV_SUJO, **ler)
     limpo = pd.read_csv(caminho_limpo or config.CSV_LIMPO, **ler)
     if list(sujo.columns) != list(limpo.columns):
-        raise ValueError("dirty e clean tem colunas diferentes")
+        raise DadosInvalidos("dirty e clean tem colunas diferentes")
     if len(sujo) != len(limpo):
-        raise ValueError(f"dirty tem {len(sujo)} linhas e clean tem {len(limpo)}")
+        raise DadosInvalidos(
+            f"dirty tem {len(sujo)} linhas e clean tem {len(limpo)}")
 
-    nomes = list(colunas) if colunas else [c for c in sujo.columns if c.lower() != "index"]
+    # Lista vazia e' um pedido explicito de nenhuma coluna; so' None quer dizer
+    # "todas as colunas do dataset".
+    nomes = (list(colunas) if colunas is not None
+             else [c for c in sujo.columns if c.lower() != "index"])
     faltando = [n for n in nomes if n not in sujo.columns]
     if faltando:
-        raise ValueError(f"coluna(s) inexistente(s): {faltando}")
+        raise DadosInvalidos(f"coluna(s) inexistente(s): {faltando}")
     return Tabela(sujo=sujo, limpo=limpo,
                   colunas=[montar_coluna(sujo, limpo, n) for n in nomes])
 

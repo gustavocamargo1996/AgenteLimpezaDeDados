@@ -29,6 +29,7 @@ Loop de refinamento da deteccao (--iteracoes-deteccao N>1), tudo sem API:
 
     python verificar_e2e.py
 """
+import inspect
 import types
 
 import numpy as np
@@ -232,6 +233,17 @@ def teste_sandbox_detectar(c: Contador):
             "nao a allowlist ser exaustiva (limite declarado)")
 
 
+def _nomes_executaveis(*funcoes) -> set:
+    """Nomes que o CODIGO das funcoes usa, ignorando docstring e comentario."""
+    import io as _io
+    import tokenize
+
+    fonte = "".join(inspect.getsource(f) for f in funcoes)
+    return {tok.string
+            for tok in tokenize.generate_tokens(_io.StringIO(fonte).readline)
+            if tok.type == tokenize.NAME}
+
+
 def teste_construir_mascara(c: Contador):
     secao("5. construir_mascara Series: por-coluna, POSICIONAL, sem clean")
     # Marca so' o marcador '%': idioma contains sobre a coluna inteira.
@@ -278,21 +290,12 @@ def teste_construir_mascara(c: Contador):
     #  (b) o codigo executavel (sem comentarios/docstrings) nao usa nome
     #      clean/limpo nem read_csv. Usamos tokenize para ignorar o texto do
     #      docstring (que legitimamente MENCIONA que nao le clean).
-    import inspect
-    import io
-    import tokenize
-
     params = set(inspect.signature(deteccao.aplicar_detectores).parameters)
     params |= set(inspect.signature(deteccao.construir_mascara).parameters)
     c.check("clean" not in params and "limpo" not in params,
             f"assinatura sem parametro clean/limpo: {sorted(params)}")
 
-    fonte = (inspect.getsource(deteccao.aplicar_detectores)
-             + inspect.getsource(deteccao.construir_mascara))
-    nomes = set()
-    for tok in tokenize.generate_tokens(io.StringIO(fonte).readline):
-        if tok.type == tokenize.NAME:
-            nomes.add(tok.string)
+    nomes = _nomes_executaveis(deteccao.aplicar_detectores, deteccao.construir_mascara)
     c.check({"clean", "limpo", "read_csv"}.isdisjoint(nomes),
             "codigo executavel nao referencia clean/limpo/read_csv (ignorando docstring)")
 
@@ -937,6 +940,66 @@ def teste_prompts_constroem(c: Contador):
             "o LLM ve o regex [A-Z]{2} correto (chave dobrada des-escapa)")
 
 
+class _ColunaCega:
+    """Duble de Coluna cujo `.limpo` levanta ao ser lido."""
+
+    def __init__(self, nome, sujo):
+        self.nome = nome
+        self.sujo = sujo
+        self.valores_distintos = sorted(sujo.unique().tolist())
+        self.contagem = sujo.value_counts().to_dict()
+
+    @property
+    def limpo(self):
+        raise AssertionError("a deteccao leu coluna.limpo")
+
+
+class _AmostraCega:
+    """Duble de Amostra cujo `.rotulados` (o orcamento com clean) levanta."""
+
+    def __init__(self, representantes, total_linhas, total_distintos):
+        self.representantes = representantes
+        self.linhas = set()
+        self.total_linhas = total_linhas
+        self.total_distintos = total_distintos
+
+    @property
+    def rotulados(self):
+        raise AssertionError("a deteccao leu amostra.rotulados")
+
+
+def teste_deteccao_nao_le_clean(c: Contador):
+    """gerar_regra_deteccao recebe objetos que CARREGAM o clean; prova que nao o le.
+
+    Antes ela recebia `representantes_sujos: list[str]` e a cegueira era
+    estrutural. Com Coluna/Amostra o gabarito esta ao alcance da mao, entao a
+    garantia precisa de teste: os dubles levantam se alguem tocar `coluna.limpo`
+    ou `amostra.rotulados`."""
+    secao("15. Deteccao e' cega: gerar_regra_deteccao nao toca clean")
+    codigo_oz = "def detectar(col):\n    return col.str.endswith('oz')\n"
+    col = _ColunaCega("ounces", pd.Series(["12.0 oz", "12", "16.0 oz"]))
+    amostra = _AmostraCega(["12.0 oz", "12"], 3, 3)
+
+    def fake(_entrada):
+        return RegraDeteccao(erro_provavel=True, condicao_regex=None,
+                             codigo=codigo_oz, cadeia="sufixo oz marca o erro")
+
+    try:
+        detector = deteccao.gerar_regra_deteccao(col, amostra, RunnableLambda(fake))
+        motivo = ""
+    except AssertionError as exc:
+        detector, motivo = None, str(exc)
+    c.check(detector is not None,
+            f"gerar_regra_deteccao roda sem tocar o gabarito{': ' + motivo if motivo else ''}")
+    c.check(detector is not None and detector.codigo.strip() == codigo_oz.strip(),
+            "e produz o detector a partir SO' dos representantes sujos")
+
+    nomes = _nomes_executaveis(deteccao.gerar_regra_deteccao, regra._formatar_amostra)
+    c.check({"clean", "limpo", "rotulados"}.isdisjoint(nomes),
+            "codigo executavel de gerar_regra_deteccao/_formatar_amostra nao "
+            f"referencia clean/limpo/rotulados")
+
+
 def main() -> int:
     c = Contador()
     teste_prompts_constroem(c)
@@ -958,6 +1021,7 @@ def main() -> int:
     teste_selecionar_suspeito(c)
     teste_precisao_no_oraculo(c)
     teste_guarda_e_piso(c)
+    teste_deteccao_nao_le_clean(c)
 
     secao("Resultado")
     if c.problemas:

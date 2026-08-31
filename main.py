@@ -14,7 +14,7 @@ for fluxo in (sys.stdout, sys.stderr):
     if hasattr(fluxo, "reconfigure"):
         fluxo.reconfigure(encoding="utf-8", errors="replace")
 
-from limpeza import config, pipeline  # noqa: E402
+from limpeza import config, dados, pipeline  # noqa: E402
 
 
 def _argumentos(argv=None):
@@ -77,7 +77,7 @@ def main(argv=None) -> int:
         c.strip() for c in escolha.split(",") if c.strip()]
     try:
         limpador, medida = pipeline.gerar_limpador(colunas=colunas)
-    except ValueError as exc:
+    except dados.DadosInvalidos as exc:
         print(f"ERRO: {exc}", file=sys.stderr)
         return 1
 

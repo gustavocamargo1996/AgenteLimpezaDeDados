@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 from langchain_core.runnables import RunnableLambda
 
 from limpeza import amostragem, config, deteccao, pipeline
@@ -134,3 +135,45 @@ def test_espinha_absorve_os_dicionarios_paralelos_num_trabalho(tmp_path, monkeyp
         assert trilha["coluna"] == trabalho.coluna.nome
         assert sum(contagem.values()) == trilha["marcadas"]
         assert set(trabalho.medida) == {"deteccao", "correcao"}
+
+
+def test_refino_que_falha_mantem_a_regra_de_1_passe(monkeypatch):
+    """A segunda politica da fronteira: a regra que ja passou no portao sobrevive."""
+    from limpeza.tipos import Detector
+
+    de_1_passe = Detector(codigo=DETECTA_OZ, funcao=lambda col: col.str.endswith("oz"),
+                          cadeia="sufixo oz")
+
+    def explodir(*_a, **_k):
+        raise RuntimeError("oraculo fora do ar")
+
+    monkeypatch.setattr(amostragem, "representantes", lambda coluna: _amostra())
+    monkeypatch.setattr(deteccao, "gerar_regra_deteccao",
+                        lambda *_a, **_k: de_1_passe)
+    monkeypatch.setattr(deteccao, "refinar_regra_deteccao", explodir)
+
+    trabalho = pipeline._processar_coluna(_coluna("ounces"), {"deteccao": None})
+
+    assert trabalho.detector is de_1_passe
+    assert trabalho.detector.codigo == DETECTA_OZ
+
+
+def test_lista_de_colunas_vazia_nao_vira_o_dataset_inteiro():
+    """Lista vazia pede nenhuma coluna; so' None quer dizer 'todas'."""
+    from limpeza import dados
+
+    comum = dict(caminho_sujo=FIXTURES / "beers_dirty_300.csv",
+                 caminho_limpo=FIXTURES / "beers_clean_300.csv")
+    assert dados.carregar(colunas=[], **comum).colunas == []
+    assert len(dados.carregar(colunas=None, **comum).colunas) > 1
+
+
+def test_coluna_inexistente_levanta_erro_de_argumento():
+    """O erro de argumento tem tipo proprio, para a CLI nao capturar ValueError largo."""
+    from limpeza import dados
+
+    assert issubclass(dados.DadosInvalidos, ValueError)
+    with pytest.raises(dados.DadosInvalidos, match="inexistente"):
+        dados.carregar(caminho_sujo=FIXTURES / "beers_dirty_300.csv",
+                       caminho_limpo=FIXTURES / "beers_clean_300.csv",
+                       colunas=["nao_existe"])
