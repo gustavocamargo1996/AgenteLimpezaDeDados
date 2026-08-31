@@ -105,10 +105,17 @@ limpeza/
     regras.py                 agente especificador + agente tradutor (JSON → Python)
     fd.py                     dependência funcional: MI, proposta, gate, aplicação
   sandbox.py                portão AST + namespace restrito (roda em toda etapa que gera código)
-  empacotar.py              etapa 6 — escreve o limpador_<nome>.py autônomo
-  metricas.py               etapa 5 — P/R/F1 de detecção, acerto/dano de correção
-  relatorio.py              artefatos por execução (cadeias.md, cascata.md, ...)
+  empacotar.py              etapa 5 — escreve o limpador_<nome>.py autônomo
+  metricas.py               etapa 6 — P/R/F1 de detecção, acerto/dano de correção
+  relatorio.py              artefatos por execução (cadeias_deteccao.md, cascata.md, ...)
 ```
+
+A numeração acima é a das chamadas em `gerar_limpador`, logo abaixo — é ela que
+vale. **Atenção:** os docstrings de `limpeza/empacotar.py` e
+`limpeza/metricas.py` trazem "Etapa 6" e "Etapa 5" **trocados** em relação à
+ordem real (empacotar roda antes de metricas, e o design doc numera
+empacotar=(5), metricas=(6)). São os docstrings que estão errados, não esta
+tabela; corrija-os na próxima tarefa que tocar nesses arquivos.
 
 ### A ordem das etapas, sem intermediário
 

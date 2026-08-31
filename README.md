@@ -141,6 +141,23 @@ O invariante congelado do `beers` (300 linhas) mede exatamente isso: 495 erros,
 números estão travados em `tests/test_invariante.py` — alterá-los é bug, não
 melhoria.
 
+### Um número é de uma execução, não uma propriedade do método
+
+**`temperature=0` não garante determinismo.** Duas execuções com entrada
+idêntica — mesmo dataset, mesmo modelo, mesmo prompt, e os mesmos
+representantes, já que o KMeans usa `random_state=0` — podem produzir regras
+diferentes e, com elas, métricas diferentes. Já foi medido nesta POC: uma
+coluna oscilou entre 100% e 11,3% de acerto entre duas execuções do mesmo dia
+(o histórico está no `CHANGELOG.md`, em `[0.1.0]`, "Variância entre
+execuções").
+
+Consequência prática: **nenhum número deste README é propriedade do método** —
+todos vêm de uma execução. Colunas cuja regra é estruturalmente simples
+repetem; colunas onde generalizar exige um salto oscilam muito. Conclusão
+comparativa de verdade exigiria rodar k vezes e reportar a faixa, o que esta
+POC **não faz**. O invariante acima escapa disso só porque mede um limpador
+**congelado**, sem chamar LLM.
+
 ## Segurança
 
 O pipeline executa código Python gerado por LLM. Antes de qualquer execução, o

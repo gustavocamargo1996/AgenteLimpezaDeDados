@@ -88,8 +88,10 @@ Construção da POC (22–23/jul/2026).
 > `main.py:_preparar_itens` (a lógica de ambiguidade vive em
 > `limpeza/correcao/cascata.py::_itens`); `dados.particionar` e as duas escalas
 > de holdout `generalizacao`/`cobertura`, substituídas pelo F1 de reparo de
-> `avaliar_limpador.py`; e a seção "Variância entre execuções" do README, cujo
-> conteúdo está integralmente reproduzido em **Documented**, logo abaixo.
+> `avaliar_limpador.py`. A seção "Variância entre execuções" do README saiu com
+> os modos que ela media, mas a advertência que ela carregava continua visível
+> no README (em "As métricas de reparo"); a medição de julho está preservada
+> em **Documented**, logo abaixo.
 
 ### Added
 
@@ -127,8 +129,8 @@ Construção da POC (22–23/jul/2026).
 
 ### Documented
 
-- **Variância entre execuções** (então na seção homônima do README; hoje esta
-  entrada é o único registro). Duas
+- **Variância entre execuções** (então na seção homônima do README; hoje o
+  README carrega a advertência e esta entrada guarda a medição). Duas
   execuções de 23/07 com entrada idêntica — mesmo dataset, modelo, prompt e os mesmos
   representantes (KMeans `random_state=0`) — divergiram: `city` no modo `budget` fez
   100% às 11h33 e 11,3% às 17h11, e `state` no `blind` alternou entre `erro=sim` e
