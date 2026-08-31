@@ -177,3 +177,22 @@ def test_coluna_inexistente_levanta_erro_de_argumento():
         dados.carregar(caminho_sujo=FIXTURES / "beers_dirty_300.csv",
                        caminho_limpo=FIXTURES / "beers_clean_300.csv",
                        colunas=["nao_existe"])
+
+
+def test_carregar_aceita_caminhos_diretos():
+    """A entrada e' o caminho do CSV, sem catalogo por nome de dataset."""
+    from limpeza import dados
+
+    tabela = dados.carregar(FIXTURES / "beers_dirty_300.csv",
+                            FIXTURES / "beers_clean_300.csv")
+    assert len(tabela.sujo) == 300
+    assert list(tabela.sujo.columns) == list(tabela.limpo.columns)
+    assert tabela.nome == "beers_300"
+
+
+def test_caminho_sujo_inexistente_levanta_dados_invalidos():
+    """Caminho que nao existe e' sinalizado com o mesmo tipo de erro, nao um traceback cru."""
+    from limpeza import dados
+
+    with pytest.raises(dados.DadosInvalidos, match="nao encontrado"):
+        dados.carregar(FIXTURES / "nao_existe.csv", FIXTURES / "beers_clean_300.csv")

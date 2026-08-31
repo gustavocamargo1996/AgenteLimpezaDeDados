@@ -8,7 +8,7 @@ from .correcao import fd, regras
 from .tipos import Coluna, Trabalho
 
 
-def gerar_limpador(caminho_sujo=None, caminho_limpo=None, colunas=None,
+def gerar_limpador(caminho_sujo, caminho_limpo, colunas=None,
                    saida=None) -> tuple[Path, dict]:
     """Gera um limpador.py a partir do sujo e do orcamento de rotulos."""
     tabela = dados.carregar(caminho_sujo, caminho_limpo, colunas)
@@ -25,10 +25,10 @@ def gerar_limpador(caminho_sujo=None, caminho_limpo=None, colunas=None,
     mascara = deteccao.construir_mascara(trabalhos, tabela)
     corrigido = correcao.rodar_cascata(trabalhos, tabela, mascara, agentes)
     limpador = empacotar.gerar_limpador(
-        trabalhos, saida / f"limpador_{config.DATASET}_{carimbo}.py"
+        trabalhos, saida / f"limpador_{tabela.nome}_{carimbo}.py", tabela.nome
     )
     medida = metricas.avaliar(trabalhos, tabela, mascara, corrigido)
-    relatorio.escrever(saida, trabalhos, mascara, corrigido, medida)
+    relatorio.escrever(saida, tabela.nome, trabalhos, mascara, corrigido, medida)
     return limpador, medida
 
 
@@ -78,8 +78,7 @@ def _construir_agentes() -> dict:
 def _anunciar(tabela) -> None:
     """Uma linha com o que este run vai processar."""
     nomes = [c.nome for c in tabela.colunas]
-    marca = f" sufixo={config.SUFIXO}" if config.SUFIXO else ""
-    print(f"[e2e] dataset={config.DATASET}{marca} | {len(tabela.sujo)} linhas "
+    print(f"[e2e] dataset={tabela.nome} | {len(tabela.sujo)} linhas "
           f"| colunas={nomes}", flush=True)
     print(f"[e2e] modelo={config.MODELO_LLM} | "
           f"iteracoes_deteccao={config.ITERACOES_DETECCAO} "

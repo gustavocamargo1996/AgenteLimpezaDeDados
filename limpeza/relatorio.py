@@ -44,7 +44,7 @@ def _bloco_refinamento(historico: list, orcamento) -> str:
     return "\n".join(linhas)
 
 
-def escrever(saida: Path, trabalhos: list, mascara, corrigido, medida: dict) -> None:
+def escrever(saida: Path, nome: str, trabalhos: list, mascara, corrigido, medida: dict) -> None:
     """Escreve os artefatos do run: as duas tabelas, os dois .json e os dois .md."""
     mascara.to_csv(saida / "mascara.csv", index=False)
     corrigido.to_csv(saida / "correcoes.csv", index=False)
@@ -55,20 +55,19 @@ def escrever(saida: Path, trabalhos: list, mascara, corrigido, medida: dict) -> 
     (saida / "correcao_metricas.json").write_text(
         json.dumps(medida["correcao"], indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    (saida / "cascata.md").write_text(_cascata_md(trabalhos), encoding="utf-8")
-    (saida / "cadeias_deteccao.md").write_text(_cadeias_md(trabalhos), encoding="utf-8")
+    (saida / "cascata.md").write_text(_cascata_md(nome, trabalhos), encoding="utf-8")
+    (saida / "cadeias_deteccao.md").write_text(_cadeias_md(nome, trabalhos), encoding="utf-8")
 
 
-def _titulo(assunto: str) -> str:
-    """Cabecalho comum dos .md, com o dataset e a fatia do run."""
-    marca = f" (sufixo {config.SUFIXO})" if config.SUFIXO else ""
-    return f"# {assunto} -- `{config.DATASET}`{marca}"
+def _titulo(assunto: str, nome: str) -> str:
+    """Cabecalho comum dos .md, com o nome do dataset."""
+    return f"# {assunto} -- `{nome}`"
 
 
-def _cascata_md(trabalhos: list) -> str:
+def _cascata_md(nome: str, trabalhos: list) -> str:
     """Qual camada resolveu cada coluna, com a contagem que fecha o invariante."""
     linhas = [
-        _titulo("Cascata de correcao"),
+        _titulo("Cascata de correcao", nome),
         f"\nModelo `{config.MODELO_LLM}`\n",
         "\n| Coluna | Marcadas | Codigo | FD | Nao resolvida | Soma confere |",
         "|---|---|---|---|---|---|",
@@ -104,11 +103,11 @@ def _cascata_md(trabalhos: list) -> str:
     return "\n".join(linhas)
 
 
-def _cadeias_md(trabalhos: list) -> str:
+def _cadeias_md(nome: str, trabalhos: list) -> str:
     """Cadeia, criterio e codigo de deteccao de cada coluna, com o refinamento."""
     # O bloco por coluna e' o do 1-passe; o historico do loop so' entra com N>1.
     partes = [
-        _titulo("Cadeias de deteccao"),
+        _titulo("Cadeias de deteccao", nome),
         f"\nDeteccao INTRA-COLUNA (a regra ve um escalar, nao a linha). "
         f"Modelo `{config.MODELO_LLM}`.\n",
     ]

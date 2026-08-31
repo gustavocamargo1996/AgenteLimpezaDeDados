@@ -1,12 +1,13 @@
 """CLI da POC: le os argumentos, chama a espinha e imprime o resultado.
 
 Uso:
-    python main.py                          # gera o limpador do dataset padrao
-    python main.py --colunas ounces,state   # subconjunto
-    python main.py --colunas todas          # todas as colunas, sem vies de selecao
+    python main.py --sujo dados_sujo.csv --limpo dados_limpo.csv
+    python main.py --sujo dados_sujo.csv --limpo dados_limpo.csv --colunas ounces,state
+    python main.py --sujo dados_sujo.csv --limpo dados_limpo.csv --colunas todas
 """
 import argparse
 import sys
+from pathlib import Path
 
 # Windows abre o stdout em cp1252 e as cadeias saem com mojibake no terminal.
 # Os arquivos .md ja saem em utf-8; isto conserta so' a impressao.
@@ -20,13 +21,13 @@ from limpeza import config, dados, pipeline  # noqa: E402
 def _argumentos(argv=None):
     """Le a linha de comando."""
     ap = argparse.ArgumentParser(
-        description="POC: geracao de limpador autonomo por dataset")
-    ap.add_argument("--dataset", default=config.DATASET)
-    ap.add_argument("--colunas", default=",".join(config.COLUNAS_PADRAO),
+        description="POC: geracao de limpador autonomo a partir do dirty e do clean")
+    ap.add_argument("--sujo", required=True, help="CSV com os dados sujos")
+    ap.add_argument("--limpo", required=True, help="CSV de referencia (orcamento de rotulos)")
+    ap.add_argument("--colunas", default="todas",
                     help="lista separada por virgula, ou 'todas'")
     ap.add_argument("--modelo", default=config.MODELO_LLM)
-    ap.add_argument("--sufixo", default=None,
-                    help="fatia do dataset: '300' usa {nome}_dirty_300.csv / _clean_300.csv")
+    ap.add_argument("--saida", default="runs", help="pasta base onde o run e' escrito")
     ap.add_argument("--iteracoes-deteccao", type=int, default=config.ITERACOES_DETECCAO,
                     dest="iteracoes_deteccao",
                     help="iteracoes de refinamento da deteccao com oraculo. "
@@ -40,14 +41,10 @@ def _argumentos(argv=None):
 
 def _aplicar_config(args) -> None:
     """Passa as escolhas da linha de comando para o config, que o pipeline le."""
-    config.DATASET = args.dataset
     config.MODELO_LLM = args.modelo
-    config.SUFIXO = args.sufixo
     config.ITERACOES_DETECCAO = args.iteracoes_deteccao
     config.AMOSTRAS_POR_ITERACAO = args.amostras_iter
-    config.DIR_DATASET = config.ZERODC_DIR / "datasets" / args.dataset
-    config.CSV_SUJO, config.CSV_LIMPO = config.caminhos_dataset(
-        args.dataset, args.sufixo)
+    config.DIR_RUNS = Path(args.saida)
 
 
 def _imprimir(limpador, medida: dict) -> None:
@@ -68,15 +65,12 @@ def main(argv=None) -> int:
     args = _argumentos(argv)
     _aplicar_config(args)
 
-    if not config.CSV_SUJO.exists():
-        print(f"ERRO: nao encontrei {config.CSV_SUJO}", file=sys.stderr)
-        return 1
-
     escolha = args.colunas.strip()
     colunas = None if escolha.lower() == "todas" else [
         c.strip() for c in escolha.split(",") if c.strip()]
     try:
-        limpador, medida = pipeline.gerar_limpador(colunas=colunas)
+        limpador, medida = pipeline.gerar_limpador(
+            caminho_sujo=args.sujo, caminho_limpo=args.limpo, colunas=colunas)
     except dados.DadosInvalidos as exc:
         print(f"ERRO: {exc}", file=sys.stderr)
         return 1

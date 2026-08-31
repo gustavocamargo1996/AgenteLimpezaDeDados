@@ -15,9 +15,10 @@ class Coluna:
 
 @dataclass
 class Tabela:
-    """Os dois CSVs alinhados por linha e as colunas a processar."""
+    """Os dois CSVs alinhados por linha, o nome do dataset e as colunas a processar."""
     sujo: Any
     limpo: Any
+    nome: str
     colunas: list[Coluna]
 
 

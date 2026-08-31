@@ -8,17 +8,10 @@ load_dotenv()
 
 RAIZ = Path(__file__).resolve().parent.parent
 
-# --- Fontes externas (reaproveitadas do clone do ZeroDC, somente leitura) ---
-ZERODC_DIR = Path(os.getenv("ZERODC_DIR", r"F:\Projetos\GC\ZeroDC"))
-DATASET = os.getenv("DATASET", "beers")
-SUFIXO = None  # fatia do dataset: "300" usa {nome}_dirty_300.csv
-DIR_DATASET = ZERODC_DIR / "datasets" / DATASET
-CSV_SUJO = DIR_DATASET / f"{DATASET}_dirty.csv"
-CSV_LIMPO = DIR_DATASET / f"{DATASET}_clean.csv"
-
-DIR_MODELO = ZERODC_DIR / "all-MiniLM-L6-v2"
-ARQ_ONNX = DIR_MODELO / "onnx" / "model_O4.onnx"
-ARQ_TOKENIZER = DIR_MODELO / "tokenizer.json"
+# --- Modelo de embeddings local (nao e' dado do usuario, so' infra) ---
+MODELO_EMBEDDING = Path(os.getenv("MODELO_EMBEDDING", "./all-MiniLM-L6-v2"))
+ARQ_ONNX = MODELO_EMBEDDING / "onnx" / "model_O4.onnx"
+ARQ_TOKENIZER = MODELO_EMBEDDING / "tokenizer.json"
 
 DIR_RUNS = RAIZ / "runs"
 
@@ -60,19 +53,4 @@ BONUS_ARTEFATO_X = True
 MI_THRESHOLD = 0.5
 
 # --- Dados ---
-NULO = "null"  # mesmo sentinela do ZeroDC: NaN vira a string 'null'
-
-
-def caminhos_dataset(dataset: str, sufixo: str | None = None) -> tuple[Path, Path]:
-    """Resolve (csv_sujo, csv_limpo) para um dataset, com sufixo opcional.
-
-    Sem sufixo: `{nome}_dirty.csv` / `{nome}_clean.csv` (comportamento antigo).
-    Com sufixo '300': `{nome}_dirty_300.csv` / `{nome}_clean_300.csv`.
-    """
-    base = ZERODC_DIR / "datasets" / dataset
-    marca = f"_{sufixo}" if sufixo else ""
-    return base / f"{dataset}_dirty{marca}.csv", base / f"{dataset}_clean{marca}.csv"
-
-# Colunas processadas por default: as 5 que sabemos ter erro no beers (vies
-# declarado). Use --colunas todas para deixar o pipeline decidir coluna a coluna.
-COLUNAS_PADRAO = ["ounces", "ibu", "abv", "city", "state"]
+NULO = "null"  # sentinela de ausencia: NaN vira a string 'null'

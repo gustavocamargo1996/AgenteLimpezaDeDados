@@ -12,7 +12,7 @@ Degenerado (coluna sem erro real) -> mensuravel:false, nao 0.0 silencioso (mesmo
 do resto da POC). Reporta tambem celulas FLAGADAS (detectadas e nao corrigidas).
 
 Uso:
-    python avaliar_limpador.py --limpador <path.py> --dataset beers [--sufixo 300]
+    python avaliar_limpador.py --limpador <path.py> --sujo <dirty.csv> --limpo <clean.csv>
 """
 import argparse
 import importlib.util
@@ -20,8 +20,6 @@ import warnings
 from pathlib import Path
 
 import pandas as pd
-
-from limpeza import config
 
 LER = dict(dtype=str, keep_default_na=False, na_values=[])
 
@@ -33,12 +31,6 @@ def carregar_limpador(caminho: str):
         warnings.simplefilter("ignore")  # SyntaxWarning de regex nao-raw do LLM
         spec.loader.exec_module(modulo)
     return modulo
-
-
-def caminhos(dataset: str, sufixo: str | None):
-    base = config.ZERODC_DIR / "datasets" / dataset
-    suf = f"_{sufixo}" if sufixo else ""
-    return base / f"{dataset}_dirty{suf}.csv", base / f"{dataset}_clean{suf}.csv"
 
 
 def f1_reparo(sujo: pd.Series, corrigido: pd.Series, limpo: pd.Series) -> dict:
@@ -95,16 +87,16 @@ def avaliar(caminho_limpador, caminho_sujo, caminho_limpo) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description="F1 de reparo de um limpador gerado")
     ap.add_argument("--limpador", required=True)
-    ap.add_argument("--dataset", required=True)
-    ap.add_argument("--sufixo", default=None)
+    ap.add_argument("--sujo", required=True, help="CSV com os dados sujos")
+    ap.add_argument("--limpo", required=True, help="CSV de referencia (ground truth)")
     args = ap.parse_args()
 
-    d_sujo, d_limpo = caminhos(args.dataset, args.sufixo)
-    resultado = avaliar(args.limpador, d_sujo, d_limpo)
+    resultado = avaliar(args.limpador, args.sujo, args.limpo)
     colunas, total = resultado["colunas"], resultado["total"]
 
     print(f"limpador: {Path(args.limpador).name}")
-    print(f"dataset:  {args.dataset}{'  sufixo=' + args.sufixo if args.sufixo else ''}\n")
+    print(f"sujo:     {args.sujo}")
+    print(f"limpo:    {args.limpo}\n")
     print(f"{'coluna':16s}| {'erros':>6s} | {'mudou':>6s} | {'TP':>5s} | "
           f"{'precisao':>8s} | {'recall':>6s} | {'F1':>6s} | flags")
     print("-" * 82)

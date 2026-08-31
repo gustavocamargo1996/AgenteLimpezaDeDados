@@ -8,11 +8,18 @@ se o KMeans esta escolhendo mal, nenhum prompt salva.
 """
 import os
 import sys
+from pathlib import Path
 
 from limpeza import amostragem, config, dados, sandbox
 from limpeza.amostragem import Embedder
 
 OK, FALHA = "  [ok] ", "  [!!] "
+
+# Fixtures versionadas: mantem este script independente de qualquer clone externo.
+FIXTURES = Path(__file__).resolve().parent / "tests" / "fixtures"
+CSV_SUJO = FIXTURES / "beers_dirty_300.csv"
+CSV_LIMPO = FIXTURES / "beers_clean_300.csv"
+COLUNAS = ["ounces", "ibu", "abv", "city", "state"]
 
 
 def secao(titulo):
@@ -24,8 +31,8 @@ def main() -> int:
 
     secao("1. Caminhos")
     for rotulo, caminho in [
-        ("dataset sujo", config.CSV_SUJO),
-        ("dataset limpo", config.CSV_LIMPO),
+        ("dataset sujo", CSV_SUJO),
+        ("dataset limpo", CSV_LIMPO),
         ("modelo ONNX", config.ARQ_ONNX),
         ("tokenizer", config.ARQ_TOKENIZER),
     ]:
@@ -34,11 +41,11 @@ def main() -> int:
         print(f"{OK if existe else FALHA}{rotulo}: {caminho}")
 
     if problemas:
-        print("\nCaminho faltando -- ajuste ZERODC_DIR no .env")
+        print("\nCaminho faltando -- ajuste MODELO_EMBEDDING no .env")
         return 1
 
     secao("2. Dados")
-    tabela = dados.carregar(colunas=config.COLUNAS_PADRAO)
+    tabela = dados.carregar(CSV_SUJO, CSV_LIMPO, colunas=COLUNAS)
     print(f"{OK}{len(tabela.sujo)} linhas, {len(tabela.sujo.columns)} colunas")
     for col in tabela.colunas:
         erradas = int((col.sujo != col.limpo).sum())
