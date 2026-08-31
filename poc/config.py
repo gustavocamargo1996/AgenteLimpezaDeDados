@@ -37,12 +37,8 @@ MAX_REPRESENTANTES = 12
 MAX_TENTATIVAS_CODIGO = 3
 
 # --- Loop de refinamento da deteccao (--iteracoes-deteccao N) ---
-# Default 1 = deteccao de 1 passe (comportamento atual, SEM loop). N>1 ativa o
-# active learning com oraculo (clean) que refina `detectar(valor)` iteracao a
-# iteracao, para quebrar o ponto cego da corrupcao universal (ounces/abv/city).
-# AMOSTRAS_POR_ITERACAO = quantos valores distintos o oraculo rotula por iteracao
-# (metade previsto-sujo, metade previsto-limpo).
-ITERACOES_DETECCAO = 1
+# 5 iteracoes x 2 amostras = orcamento de ~10 rotulos por coluna.
+ITERACOES_DETECCAO = 5
 AMOSTRAS_POR_ITERACAO = 2
 # Guarda heuristica contra regra AMPLA DEMAIS no loop de deteccao: precisao
 # minima que a regra revisada (e a resident final) deve ter no conjunto ROTULADO

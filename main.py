@@ -128,12 +128,10 @@ def rodar_e2e(nomes, sujo, limpo, embedder, args) -> int:
         funcoes_deteccao[nome] = saida_det["funcao"]
         regras_deteccao[nome] = saida_det["regra"]
 
-        # Loop de refinamento com oraculo SO' quando iteracoes>1. O 1-passe
-        # (default) nao entra aqui -- caminho identico ao atual (invariante 7).
-        # A regra refinada SOBRESCREVE funcoes_deteccao/regras_deteccao ANTES de
-        # construir_mascara (que roda apos este loop), senao a mascara usaria a
-        # regra de 1-passe e o refino nao teria efeito (invariante 6).
-        if args.iteracoes_deteccao > 1 and saida_det["regra"].codigo != deteccao.DETECTA_NADA:
+        # Loop de refinamento com oraculo. Guarda: coluna com regra DETECTA_NADA
+        # nao tem o que refinar. Regra refinada SOBRESCREVE funcoes_deteccao/regras_deteccao
+        # ANTES de construir_mascara (que roda apos este loop).
+        if saida_det["regra"].codigo != deteccao.DETECTA_NADA:
             print(f"  [e2e] {nome}: refinando por {args.iteracoes_deteccao} "
                   f"iteracoes com oraculo...", flush=True)
             try:
