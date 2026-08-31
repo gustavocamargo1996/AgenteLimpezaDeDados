@@ -285,10 +285,39 @@ coluna) antes de qualquer algoritmo rodar.
 - Melhorar o recall. Este trabalho preserva comportamento; não persegue número.
 - Atacar o ponto cego do `ounces` (detecção F1=0 na corrupção universal).
 - Trocar de modelo ou de provedor.
-- Detecção cross-column (hoje a regra é `detectar(col) -> Series`, intra-coluna).
+- Detecção cross-column — **é o próximo projeto**, não um descarte. Ver seção 9.
 - Publicar pacote, versionar release, empacotar para distribuição.
 
-## 9. Riscos
+## 9. Restrição: preservar a costura cross-column
+
+O trabalho seguinte a este é trocar o contrato de detecção de
+`detectar(col) -> Series` (intra-coluna) por uma forma cross-column, que enxerga
+outras colunas da linha. **Esta simplificação não pode espalhar o que hoje está
+concentrado.**
+
+O contrato intra-coluna está codificado em 7 pontos, 3 arquivos:
+
+| Onde | O quê | Já preparado? |
+|---|---|---|
+| `sandbox.validar` | `nome_funcao`/`nome_argumento` parametrizados | **sim** — troca sem tocar na lógica |
+| `sandbox._ATRIBUTOS_SERIE` | allowlist que bloqueia cross-row e travessia de `pd` | não — precisa de um modo novo |
+| `sandbox.materializar` | `pd` fora do namespace do código gerado | não |
+| `deteccao/regra.py` | o prompt declara `detectar(col)` (4 ocorrências hoje) | não |
+| `deteccao/regra.py` | sentinela `DETECTA_NADA = "def detectar(col): ..."` | não |
+| `deteccao/mascara.py` | aplica `detectar(col)` uma vez por coluna, posicional | não |
+| `empacotar.py` | cópia congelada da mesma aplicação, no limpador gerado | não |
+
+**Regra para a implementação:** esses 7 pontos continuam sendo os *únicos*
+lugares que sabem que a detecção é intra-coluna. Nenhuma etapa nova pode passar
+a assumir isso — em particular, o tipo `Detector` da seção 5 guarda o código e a
+função sem interpretar a assinatura, e a máscara é consumida como
+`DataFrame[bool]` pelas etapas 4, 5 e 6, que não precisam saber como foi
+construída.
+
+O `CLAUDE.md` (entregável 5) registra esta lista, para a próxima sessão saber
+onde cortar sem redescobrir.
+
+## 10. Riscos
 
 | Risco | Mitigação |
 |---|---|
