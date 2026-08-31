@@ -16,7 +16,7 @@ Invariante contabil: por coluna,
     contagem[codigo] + contagem[fd] + contagem[nao_resolvida]
     == numero de celulas marcadas.
 """
-from . import contexto, fd as fd_mod, gerador_codigo, identificador_regras
+from . import fd as fd_mod, regras
 
 
 def _gate_codigo(funcao, rows: list[dict]) -> bool:
@@ -42,14 +42,14 @@ def _camada_codigo(coluna, rotulados, agentes):
     limpador autonomo -- e' a copia fiel da correcao de codigo aplicada quando o
     gate passa.
     """
-    regra = identificador_regras.especificar(
+    regra = regras.especificar(
         coluna=coluna,
         itens=rotulados["itens"],
         total_linhas=rotulados["total_linhas"],
         total_distintos=rotulados["total_distintos"],
         agente=agentes.get("especificador"),
     )
-    traducao = gerador_codigo.traduzir(regra, agente=agentes.get("codigo"))
+    traducao = regras.traduzir(regra, agente=agentes.get("codigo"))
     return regra, traducao["funcao"], traducao["codigo"]
 
 
@@ -103,7 +103,7 @@ def rodar_cascata(
     # -------- Camada 2: FD -----------------------------------------------------
     fd = None
     gate_fd = None
-    candidatos = contexto.candidatos_determinantes(df, coluna, limiar=mi_threshold)
+    candidatos = fd_mod.candidatos_determinantes(df, coluna, limiar=mi_threshold)
     if pendentes and candidatos:
         fd = fd_mod.propor_fd(coluna, rows, candidatos, df, agente=agentes.get("fd"))
         gate_fd = fd_mod.validar_fd(fd, rows, df, mascara_completa, coluna)

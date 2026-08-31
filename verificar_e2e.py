@@ -35,8 +35,10 @@ import numpy as np
 import pandas as pd
 from langchain_core.runnables import RunnableLambda
 
-from poc import avaliacao, cascata, config, contexto, deteccao, empacotar, fd, sandbox
-from poc.esquemas import DependenciaFuncional, RegraDeteccao
+from limpeza import config, deteccao, empacotar, metricas, sandbox
+from limpeza.correcao import cascata, fd
+from limpeza.deteccao import oraculo, refino, regra
+from limpeza.esquemas import DependenciaFuncional, RegraDeteccao
 
 OK, FALHA = "  [ok] ", "  [!!] "
 
@@ -71,10 +73,10 @@ def teste_mi(c: Contador):
         "B": ["1", "1", "2", "2", "3", "3"],   # B determinada por A
         "C": ["p", "q", "p", "q", "p", "q"],   # C: pares (A,C) ocorrem 1x -> filtrados
     })
-    mi = contexto.calc_mi(df, "A")
+    mi = fd.calc_mi(df, "A")
     c.check(mi["B"] >= 0.5, f"B tem MI normalizada alta de A: {mi['B']}")
     c.check(mi["B"] > mi["C"], f"B ({mi['B']}) > C ({mi['C']}) como determinante de A")
-    cand = contexto.candidatos_determinantes(df, "A", limiar=0.5)
+    cand = fd.candidatos_determinantes(df, "A", limiar=0.5)
     c.check("B" in cand and "C" not in cand and "A" not in cand,
             f"candidatos determinantes de A = {cand}")
 
@@ -84,7 +86,7 @@ def teste_metricas_deteccao(c: Contador):
     sujo = pd.Series(["a", "B", "c", "d", "e"])
     limpo = pd.Series(["a", "b", "c", "D", "e"])   # erros em idx1 e idx3
     mask = pd.Series([0, 1, 0, 0, 1])              # preve idx1 (TP) e idx4 (FP); erra idx3 (FN)
-    d = avaliacao.metricas_deteccao(mask, sujo, limpo)
+    d = metricas.metricas_deteccao(mask, sujo, limpo)
     c.check(d["precisao"] == 0.5 and d["recall"] == 0.5 and d["f1"] == 0.5
             and d["mensuravel"] is True,
             f"P/R/F1 = {d['precisao']}/{d['recall']}/{d['f1']} mensuravel={d['mensuravel']} "
@@ -95,7 +97,7 @@ def teste_metricas_deteccao(c: Contador):
     sujo0 = pd.Series(["a", "b", "c"])
     limpo0 = pd.Series(["a", "b", "c"])            # sem erro real
     mask0 = pd.Series([0, 0, 0])
-    d0 = avaliacao.metricas_deteccao(mask0, sujo0, limpo0)
+    d0 = metricas.metricas_deteccao(mask0, sujo0, limpo0)
     c.check(d0["mensuravel"] is False and d0["precisao"] is None
             and d0["recall"] is None and d0["f1"] is None,
             f"degenerado tp+fn=0 -> mensuravel:false, P/R/F1 = n/d (nao 0.0): "
@@ -104,19 +106,19 @@ def teste_metricas_deteccao(c: Contador):
     # Degenerado B (plano secao 8): a mascara MARCA celulas mas nenhuma e' erro
     # real -> ainda n/d, mas os FP sao contabilizados.
     mask0b = pd.Series([1, 0, 1])                  # tudo falso positivo; tp+fn=0
-    d0b = avaliacao.metricas_deteccao(mask0b, sujo0, limpo0)
+    d0b = metricas.metricas_deteccao(mask0b, sujo0, limpo0)
     c.check(d0b["mensuravel"] is False and d0b["f1"] is None
             and d0b["falsos_positivos"] == 2,
             f"marca sem erro real -> n/d, mas FP=2 contabilizados: "
             f"mensuravel={d0b['mensuravel']} FP={d0b['falsos_positivos']}")
 
-    dh = avaliacao.metricas_deteccao(mask, sujo, limpo, holdout=[4])  # remove o FP
+    dh = metricas.metricas_deteccao(mask, sujo, limpo, holdout=[4])  # remove o FP
     c.check(dh["precisao"] == 1.0 and dh["recall"] == 0.5 and dh["mensuravel"] is True,
             f"holdout remove o FP idx4: P={dh['precisao']} R={dh['recall']} (esperado 1.0/0.5)")
 
     # correcao: holdout exclui as celulas rotuladas
     corr = pd.Series(["a", "b", "c", "D", "e"])    # corrigiu idx1 e idx3
-    mc = avaliacao.metricas_correcao(corr, sujo, limpo, holdout=[1])
+    mc = metricas.metricas_correcao(corr, sujo, limpo, holdout=[1])
     c.check(mc["erradas"] == 1 and mc["acertos"] == 1 and mc["dano"] == 0,
             f"metricas_correcao com holdout=[1]: erradas={mc['erradas']} "
             f"acertos={mc['acertos']} dano={mc['dano']}")
@@ -189,7 +191,7 @@ def teste_sandbox_detectar(c: Contador):
     try:
         f_escalar = _mat_det("def detectar(col):\n    return '%' in col\n")
         sandbox.testar_fumaca(
-            f_escalar, pd.Series(deteccao._AMOSTRAS_FUMACA), series_mode=True
+            f_escalar, pd.Series(regra._AMOSTRAS_FUMACA), series_mode=True
         )
         rejeitou_escalar = False
     except sandbox.CodigoRejeitado:
@@ -295,29 +297,29 @@ def teste_construir_mascara(c: Contador):
 def teste_classificar(c: Contador):
     secao("5b. _classificar: aplicacao Series posicional, robusta a falha")
     f_oz = _mat_det("def detectar(col):\n    return col.str.endswith('oz')\n")
-    marcas = deteccao._classificar(f_oz, ["12", "12 oz", "16", "16 oz"])
+    marcas = oraculo._classificar(f_oz, ["12", "12 oz", "16", "16 oz"])
     c.check(marcas == [False, True, False, True],
             f"classifica lista posicionalmente, len-correto: {marcas}")
     c.check(all(isinstance(x, bool) for x in marcas),
             "devolve python bool (nao numpy.bool_)")
 
     # funcao None -> [False]*n
-    c.check(deteccao._classificar(None, ["a", "b", "c"]) == [False, False, False],
+    c.check(oraculo._classificar(None, ["a", "b", "c"]) == [False, False, False],
             "funcao None -> [False]*n")
 
     # retorno escalar (nao-Series) -> [False]*n (robusto, nunca lanca)
     f_escalar = _mat_det("def detectar(col):\n    return True\n")
-    c.check(deteccao._classificar(f_escalar, ["a", "b"]) == [False, False],
+    c.check(oraculo._classificar(f_escalar, ["a", "b"]) == [False, False],
             "retorno nao-Series -> [False]*n")
 
     # excecao em runtime -> [False]*n
     def _f_boom(coluna):
         raise ValueError("boom")
-    c.check(deteccao._classificar(_f_boom, ["a", "b"]) == [False, False],
+    c.check(oraculo._classificar(_f_boom, ["a", "b"]) == [False, False],
             "excecao na funcao -> [False]*n")
 
     # lista vazia -> []
-    c.check(deteccao._classificar(f_oz, []) == [],
+    c.check(oraculo._classificar(f_oz, []) == [],
             "lista vazia -> []")
 
 
@@ -327,7 +329,7 @@ def teste_cascata_fd_passa(c: Contador):
     reprova (escala tudo), FD passa e resolve as celulas marcadas."""
     secao("7. Cascata: ramo FD-passa (offline)")
 
-    from poc.esquemas import DependenciaFuncional
+    from limpeza.esquemas import DependenciaFuncional
 
     # 'state' vazio em 0 e 3; 'brewery' limpa determina o valor.
     df = pd.DataFrame({
@@ -364,10 +366,10 @@ def teste_cascata_fd_passa(c: Contador):
     def fake_aplicar(fd, df_, pendentes, mascara, coluna):
         return {0: "CA", 3: "NY"}  # moda por brewery resolve as duas marcadas
 
-    orig = (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
+    orig = (cascata._camada_codigo, cascata.fd_mod.candidatos_determinantes,
             cascata.fd_mod.propor_fd, cascata.fd_mod.validar_fd,
             cascata.fd_mod.aplicar_fd)
-    (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
+    (cascata._camada_codigo, cascata.fd_mod.candidatos_determinantes,
      cascata.fd_mod.propor_fd, cascata.fd_mod.validar_fd,
      cascata.fd_mod.aplicar_fd) = (
         fake_camada_codigo, fake_candidatos, fake_propor, fake_validar,
@@ -377,7 +379,7 @@ def teste_cascata_fd_passa(c: Contador):
             "state", df, mascara_col, rotulados, mascara_completa, agentes={},
         )
     finally:
-        (cascata._camada_codigo, cascata.contexto.candidatos_determinantes,
+        (cascata._camada_codigo, cascata.fd_mod.candidatos_determinantes,
          cascata.fd_mod.propor_fd, cascata.fd_mod.validar_fd,
          cascata.fd_mod.aplicar_fd) = orig
 
@@ -591,16 +593,16 @@ def teste_amostrar_oraculo(c: Contador):
     valores = ["12", "16", "12.0 oz", "16.0 oz"]
     sujo_col = pd.Series(["12", "16", "12.0 oz", "16.0 oz"])
 
-    esc = deteccao._amostrar_oraculo(funcao, valores, emb, usados=set(), n=2, sujo_col=sujo_col)
+    esc = oraculo._amostrar_oraculo(funcao, valores, emb, usados=set(), n=2, sujo_col=sujo_col)
     sujo = [v for v in esc if v.endswith("oz")]
     limpo = [v for v in esc if not v.endswith("oz")]
     c.check(len(esc) == 2 and len(sujo) == 1 and len(limpo) == 1,
             f"escolheu 1 previsto-sujo + 1 previsto-limpo: {esc}")
 
-    esc2 = deteccao._amostrar_oraculo(funcao, valores, emb, usados=set(), n=2, sujo_col=sujo_col)
+    esc2 = oraculo._amostrar_oraculo(funcao, valores, emb, usados=set(), n=2, sujo_col=sujo_col)
     c.check(esc == esc2, f"deterministico (duas chamadas iguais): {esc} == {esc2}")
 
-    esc3 = deteccao._amostrar_oraculo(funcao, valores, emb, usados={"12.0 oz"}, n=2, sujo_col=sujo_col)
+    esc3 = oraculo._amostrar_oraculo(funcao, valores, emb, usados={"12.0 oz"}, n=2, sujo_col=sujo_col)
     c.check("12.0 oz" not in esc3 and any(v.endswith("oz") for v in esc3),
             f"respeita usados (nao repete '12.0 oz', pega o outro sujo): {esc3}")
 
@@ -614,7 +616,7 @@ def teste_montar_feedback(c: Contador):
         {"valor": "12.0 oz", "eh_erro_real": False},
         {"valor": "17", "eh_erro_real": True},
     ]
-    texto = deteccao._montar_feedback_det(funcao, rotulos)
+    texto = refino._montar_feedback_det(funcao, rotulos)
     linha_fp = next(l for l in texto.splitlines() if '"12.0 oz"' in l)
     linha_fn = next(l for l in texto.splitlines() if '"17"' in l)
     c.check("FALSO POSITIVO" in linha_fp, f"FP marcado para '12.0 oz': {linha_fp.strip()}")
@@ -622,7 +624,7 @@ def teste_montar_feedback(c: Contador):
 
     # Cumulativo: um terceiro rotulo entra e os anteriores permanecem.
     rotulos.append({"valor": "20.0 oz", "eh_erro_real": True})  # sujo & erro -> OK
-    texto2 = deteccao._montar_feedback_det(funcao, rotulos)
+    texto2 = refino._montar_feedback_det(funcao, rotulos)
     c.check('"12.0 oz"' in texto2 and '"17"' in texto2 and '"20.0 oz"' in texto2
             and len(texto2.splitlines()) == 3,
             "cumulativo: inclui todos os rotulos acumulados (3 linhas)")
@@ -656,7 +658,7 @@ def teste_refinar_deteccao(c: Contador):
     )
     f = saida["funcao"]
     c.check(f is not funcao0
-            and deteccao._classificar(f, ["12.0 oz", "12"]) == [True, False],
+            and oraculo._classificar(f, ["12.0 oz", "12"]) == [True, False],
             "sucesso: funcao final DIFERE, marca '12.0 oz' e NAO marca '12'")
     passo = saida["historico"][0]
     c.check(len(saida["historico"]) == 1 and passo["mudou"] is True
@@ -698,7 +700,7 @@ def teste_selecionar_suspeito(c: Contador):
     # comuns. NAO usa '%' (nao-alnum, invisivel de proposito).
     candidatos = ["10", "11", "12", "13", "12a"]
     sujo_col = pd.Series(["10", "11", "12", "13", "10", "11", "12", "13", "12a"])
-    pick = deteccao._selecionar_suspeito(
+    pick = oraculo._selecionar_suspeito(
         candidatos, referencia=set(), n=1, embedder=emb, sujo_col=sujo_col,
         usar_bonus_x=False,
     )
@@ -709,26 +711,26 @@ def teste_selecionar_suspeito(c: Contador):
     # '9' esta em 1 valor distinto mas 10 celulas -> frequente -> raridade BAIXA;
     # '3' em 1 valor distinto e 1 celula -> raro -> raridade ALTA.
     col_freq = pd.Series(["9"] * 10 + ["3"])
-    cc = deteccao._contar_chars_alnum(col_freq)
+    cc = oraculo._contar_chars_alnum(col_freq)
     c.check(cc.get("9") == 10 and cc.get("3") == 1,
             f"char_counts conta CELULAS (nao distintos): 9={cc.get('9')} 3={cc.get('3')}")
-    s9 = deteccao._score_artefato("9", cc, usar_bonus_x=False)
-    s3 = deteccao._score_artefato("3", cc, usar_bonus_x=False)
+    s9 = oraculo._score_artefato("9", cc, usar_bonus_x=False)
+    s3 = oraculo._score_artefato("3", cc, usar_bonus_x=False)
     c.check(s9 < s3 and abs(s9 - 0.1) < 1e-9 and abs(s3 - 1.0) < 1e-9,
             f"raridade cai com freq-de-celula: score('9')={s9} < score('3')={s3}")
 
     # (c) Bonus de 'x' LIGADO sobe um valor com 'x' vs DESLIGADO.
-    cc_x = deteccao._contar_chars_alnum(pd.Series(["1x2", "10", "20"]))
-    on = deteccao._score_artefato("1x2", cc_x, usar_bonus_x=True)
-    off = deteccao._score_artefato("1x2", cc_x, usar_bonus_x=False)
+    cc_x = oraculo._contar_chars_alnum(pd.Series(["1x2", "10", "20"]))
+    on = oraculo._score_artefato("1x2", cc_x, usar_bonus_x=True)
+    off = oraculo._score_artefato("1x2", cc_x, usar_bonus_x=False)
     c.check(on > off, f"bonus x ligado sobe o valor com 'x': on={on} > off={off}")
 
     # (d) Deterministico + respeita referencia (nao devolve valor da referencia).
     cand2 = ["10", "20x", "30", "40"]
     col2 = pd.Series(["10", "20x", "30", "40", "99"])
-    r1 = deteccao._selecionar_suspeito(cand2, referencia={"99"}, n=2, embedder=emb,
+    r1 = oraculo._selecionar_suspeito(cand2, referencia={"99"}, n=2, embedder=emb,
                                        sujo_col=col2, usar_bonus_x=False)
-    r2 = deteccao._selecionar_suspeito(cand2, referencia={"99"}, n=2, embedder=emb,
+    r2 = oraculo._selecionar_suspeito(cand2, referencia={"99"}, n=2, embedder=emb,
                                        sujo_col=col2, usar_bonus_x=False)
     c.check(r1 == r2, f"deterministico (duas chamadas iguais): {r1} == {r2}")
     c.check(set(r1) <= set(cand2) and "99" not in r1,
@@ -739,7 +741,7 @@ def teste_selecionar_suspeito(c: Contador):
     cand_deg = ["--", "++", "**"]
     col_deg = pd.Series(["--", "++", "**"])
     try:
-        deg = deteccao._selecionar_suspeito(cand_deg, referencia=set(), n=1, embedder=emb,
+        deg = oraculo._selecionar_suspeito(cand_deg, referencia=set(), n=1, embedder=emb,
                                             sujo_col=col_deg, usar_bonus_x=True)
         lancou = False
     except Exception:  # noqa: BLE001
@@ -760,12 +762,12 @@ def teste_precisao_no_oraculo(c: Contador):
 
     # Marca so' os 2 sujos -> precisao 1.0.
     so_sujos = _mat_det("def detectar(col):\n    return col.isin(['A', 'B'])\n")
-    p1 = deteccao._precisao_no_oraculo(so_sujos, rotulos)
+    p1 = refino._precisao_no_oraculo(so_sujos, rotulos)
     c.check(p1 == 1.0, f"marca so' os 2 sujos -> precisao 1.0: {p1}")
 
     # Marca 2 limpos + 1 sujo -> 1/3 = 0.333 (mira do plano; inequivoco < 0.8).
     ampla = _mat_det("def detectar(col):\n    return col.isin(['A', 'C', 'D'])\n")
-    p2 = deteccao._precisao_no_oraculo(ampla, rotulos)
+    p2 = refino._precisao_no_oraculo(ampla, rotulos)
     c.check(p2 is not None and abs(p2 - 1 / 3) < 1e-9,
             f"marca 2 limpos + 1 sujo -> precisao 0.333: {p2}")
     c.check(p2 < config.LIMITE_PRECISAO_DETECCAO,
@@ -773,7 +775,7 @@ def teste_precisao_no_oraculo(c: Contador):
 
     # Marca 0 -> None (over-flagging nao mensuravel; guarda inerte).
     nada = _mat_det(deteccao.DETECTA_NADA)
-    p3 = deteccao._precisao_no_oraculo(nada, rotulos)
+    p3 = refino._precisao_no_oraculo(nada, rotulos)
     c.check(p3 is None, f"marca 0 -> None (guarda inerte): {p3}")
 
     # ARMADILHA 1 DOCUMENTADA: com rotulos TODOS sujos, uma regra genuinamente
@@ -787,7 +789,7 @@ def teste_precisao_no_oraculo(c: Contador):
         {"valor": "16.0 oz", "eh_erro_real": True},
     ]
     marca_tudo = _mat_det("def detectar(col):\n    return col.notna()\n")
-    p_arm = deteccao._precisao_no_oraculo(marca_tudo, rotulos_so_sujos)
+    p_arm = refino._precisao_no_oraculo(marca_tudo, rotulos_so_sujos)
     c.check(p_arm == 1.0 and not (p_arm < config.LIMITE_PRECISAO_DETECCAO),
             f"Armadilha 1: rotulos todos sujos + regra ampla -> precisao 1.0, "
             f"guarda NAO fira (cegueira declarada): {p_arm}")
@@ -853,7 +855,7 @@ def teste_guarda_e_piso(c: Contador):
     )
     f_ac = saida_ac["funcao"]
     c.check(f_ac is not funcao0b
-            and deteccao._classificar(f_ac, ["A", "B"]) == [True, False],
+            and oraculo._classificar(f_ac, ["A", "B"]) == [True, False],
             "guarda (A) aceita regra precisa (precisao 1.0): funcao muda, marca so' 'A'")
     c.check(saida_ac["historico"][0]["status"] == "aplicada",
             f"aceita registra status 'aplicada': {saida_ac['historico'][0]['status']}")
@@ -871,7 +873,7 @@ def teste_guarda_e_piso(c: Contador):
         agente_update=RunnableLambda(fake_ampla),
     )
     f_piso = saida_piso["funcao"]
-    c.check(deteccao._classificar(f_piso, ["A", "B", "C"]) == [False, False, False],
+    c.check(oraculo._classificar(f_piso, ["A", "B", "C"]) == [False, False, False],
             "piso (B): resident final ampla derrubada -> funcao marca NADA")
     c.check(saida_piso["regra"].codigo == deteccao.DETECTA_NADA,
             f"piso (B): regra.codigo espelha DETECTA_NADA: {saida_piso['regra'].codigo!r}")
@@ -906,7 +908,7 @@ def teste_guarda_e_piso(c: Contador):
     )
     f_oz = saida_oz["funcao"]
     c.check(f_oz is not funcao0_oz
-            and deteccao._classificar(f_oz, ["12.0 oz"]) == [True],
+            and oraculo._classificar(f_oz, ["12.0 oz"]) == [True],
             "ounces-like: regra que marca ~100% (precisao 1.0) e' ACEITA")
     c.check(saida_oz["historico"][0]["status"] == "aplicada"
             and not any(p["status"].startswith("piso") for p in saida_oz["historico"]),
@@ -922,10 +924,10 @@ def teste_prompts_constroem(c: Contador):
     from langchain_core.prompts import ChatPromptTemplate
     try:
         p1 = ChatPromptTemplate.from_messages(
-            [("system", deteccao.SISTEMA), ("human", deteccao.HUMANO)])
+            [("system", regra.SISTEMA), ("human", regra.HUMANO)])
         p1.format(coluna="city", amostra="x", total_linhas=1, total_distintos=1)
         p2 = ChatPromptTemplate.from_messages(
-            [("system", deteccao.SISTEMA_UPDATE), ("human", deteccao.HUMANO_UPDATE)])
+            [("system", refino.SISTEMA_UPDATE), ("human", refino.HUMANO_UPDATE)])
         p2.format(coluna="abv", codigo_atual="def detectar(col): return col.isin([])",
                   feedback="x")
         ok = True
@@ -933,7 +935,7 @@ def teste_prompts_constroem(c: Contador):
         ok = False
         print("      erro:", str(exc)[:120])
     c.check(ok, "SISTEMA/HUMANO e SISTEMA_UPDATE/HUMANO_UPDATE constroem e formatam")
-    render = ChatPromptTemplate.from_messages([("system", deteccao.SISTEMA)]).format()
+    render = ChatPromptTemplate.from_messages([("system", regra.SISTEMA)]).format()
     c.check("[A-Z]" + chr(123) + "2" + chr(125) in render,
             "o LLM ve o regex [A-Z]{2} correto (chave dobrada des-escapa)")
 

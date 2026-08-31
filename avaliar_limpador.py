@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from poc import config
+from limpeza import config
 
 LER = dict(dtype=str, keep_default_na=False, na_values=[])
 

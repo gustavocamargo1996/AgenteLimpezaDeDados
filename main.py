@@ -19,12 +19,12 @@ for fluxo in (sys.stdout, sys.stderr):
     if hasattr(fluxo, "reconfigure"):
         fluxo.reconfigure(encoding="utf-8", errors="replace")
 
-from poc import (  # noqa: E402
-    amostragem, avaliacao, cascata, config, dados, deteccao, empacotar,
-    fd, gerador_codigo, identificador_regras, relatorio, sandbox,
+from limpeza import (  # noqa: E402
+    amostragem, config, dados, deteccao, empacotar, metricas, relatorio, sandbox,
 )
-from poc.embeddings import Embedder  # noqa: E402
-from poc.esquemas import RegraDeteccao  # noqa: E402
+from limpeza.amostragem import Embedder  # noqa: E402
+from limpeza.correcao import cascata, fd, regras  # noqa: E402
+from limpeza.esquemas import RegraDeteccao  # noqa: E402
 
 
 def _selecionar_representantes(coluna, embedder):
@@ -75,8 +75,8 @@ def rodar_e2e(nomes, sujo, limpo, embedder, args) -> int:
     """
     modelo = config.MODELO_LLM
     agentes = {
-        "especificador": identificador_regras.construir_agente(modelo),
-        "codigo": gerador_codigo.construir_agente(modelo),
+        "especificador": regras.construir_agente_especificador(modelo),
+        "codigo": regras.construir_agente_codigo(modelo),
         "fd": fd.construir_agente(modelo),
     }
     agente_det = deteccao.construir_agente(modelo)
@@ -208,10 +208,10 @@ def rodar_e2e(nomes, sujo, limpo, embedder, args) -> int:
     deteccao_metricas, correcao_metricas = {}, {}
     for nome in nomes:
         holdout = contexto_por_coluna[nome]["holdout"]
-        deteccao_metricas[nome] = avaliacao.metricas_deteccao(
+        deteccao_metricas[nome] = metricas.metricas_deteccao(
             mascara_completa[nome], sujo[nome], limpo[nome], holdout
         )
-        correcao_metricas[nome] = avaliacao.metricas_correcao(
+        correcao_metricas[nome] = metricas.metricas_correcao(
             corrigido[nome], sujo[nome], limpo[nome], holdout
         )
 

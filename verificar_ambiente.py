@@ -9,8 +9,8 @@ se o KMeans esta escolhendo mal, nenhum prompt salva.
 import os
 import sys
 
-from poc import amostragem, config, dados, sandbox
-from poc.embeddings import Embedder
+from limpeza import amostragem, config, dados, sandbox
+from limpeza.amostragem import Embedder
 
 OK, FALHA = "  [ok] ", "  [!!] "
 

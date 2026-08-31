@@ -2,7 +2,7 @@
 
 Porta correction.py:808-866 do ZeroDC, com duas simplificacoes DECLARADAS:
   - determinante UNICO (o ZeroDC aceita composto, correction.py:812);
-  - o candidato a determinante vem da MI normalizada (contexto.calc_mi), nao de
+  - o candidato a determinante vem da MI normalizada (`calc_mi` abaixo), nao de
     um retriever.
 
 O gate (validar_fd) exige 100% no conjunto rotulado, INCLUINDO os negativos
@@ -13,9 +13,45 @@ nao foram marcadas entram na moda.
 """
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from sklearn.metrics import mutual_info_score
 
-from . import config
-from .esquemas import DependenciaFuncional
+from .. import config
+from ..esquemas import DependenciaFuncional
+
+
+def calc_mi(df, alvo: str) -> dict:
+    """MI normalizada de cada coluna de `df` em relacao a `alvo`.
+
+    Devolve {coluna: mi_normalizada_1_casa}. A propria coluna `alvo` aparece
+    (tipicamente com 1.0) -- quem chama e' que exclui o alvo ao escolher
+    determinantes.
+    """
+
+    def mi_par(col: str) -> float:
+        if col == alvo:
+            return float(mutual_info_score(df[alvo], df[col]))
+        # pre-filtro: pares (alvo, col) que ocorrem ao menos 2x
+        contagem = df.groupby([alvo, col])[alvo].transform("size")
+        filtrado = df[contagem >= 2]
+        if filtrado.empty:
+            return 0.0
+        a = filtrado[alvo].reset_index(drop=True)
+        b = filtrado[col].reset_index(drop=True)
+        return float(mutual_info_score(a, b))
+
+    brutos = {col: mi_par(col) for col in df.columns}
+    maximo = max(brutos.values()) if brutos else 0.0
+    if maximo == 0.0:
+        return {col: 0.0 for col in brutos}
+    return {col: round(v / maximo, 1) for col, v in brutos.items()}
+
+
+def candidatos_determinantes(df, alvo: str, limiar: float | None = None) -> list[str]:
+    """Colunas (exceto o proprio alvo) com MI normalizada >= limiar."""
+    limiar = config.MI_THRESHOLD if limiar is None else limiar
+    mi = calc_mi(df, alvo)
+    return [col for col, v in mi.items() if col != alvo and v >= limiar]
+
 
 SISTEMA = """Voce identifica uma DEPENDENCIA FUNCIONAL para reparar uma coluna suja.
 
