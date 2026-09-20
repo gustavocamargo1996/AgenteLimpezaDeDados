@@ -88,6 +88,7 @@ def test_marca_os_54_erros_de_state():
     assert int(m["State"].sum()) == 54
     err = tabela.sujo["State"] != tabela.limpo["State"]
     assert int((m["State"].astype(bool) & ~err).sum()) == 0, "marcou celula correta"
+    assert int(m["City"].sum()) == 0, "marcou a coluna determinante"
 
 
 def test_marca_os_26_erros_de_climate_zone():
