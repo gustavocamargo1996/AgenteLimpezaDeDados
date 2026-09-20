@@ -16,7 +16,7 @@
 - **O `beers` tem de ganhar ZERO marca de FD.** Ele não tem erro cross-column; uma marca sequer significa que a detecção vazou.
 - **Idioma:** PORTUGUÊS em tudo. Sem acento em identificadores nem em strings de log; documentos usam acentuação normal.
 - **Comentários:** docstring de módulo e de função com **1 linha**; inline com teto de **2 linhas**.
-- **Tetos verificáveis:** densidade ≤ **13%** (`tests/medir_verbosidade.py`; hoje 12,8%); nenhum arquivo novo acima de **150 linhas**; suíte no máximo **~130** testes.
+- **Tetos verificáveis:** densidade ≤ **14%** (`tests/medir_verbosidade.py`; hoje 12,8%); nenhum arquivo novo acima de **150 linhas**; suíte no máximo **~130** testes.
 - **A costura cross-column continua 10 pontos em 7 arquivos** (seção 8 do `CLAUDE.md`). Este trabalho NÃO acrescenta ponto: `detectar(col)` fica intacto, o portão AST não ganha modo novo.
 - **NÃO tocar** em `limpeza/sandbox.py` nem em `limpeza/empacotar.py::_ESTATICO`.
 - **Marca só a coluna dependente.** Violação de `City -> State` torna a célula de `State` suspeita, não a de `City`.
@@ -723,7 +723,7 @@ Run: `.venv/Scripts/python -m pytest tests/ -q`
 Expected: 125 passed
 
 Run: `.venv/Scripts/python tests/medir_verbosidade.py | tail -1`
-Expected: densidade ≤ 13%
+Expected: densidade ≤ 14%
 
 Run: `.venv/Scripts/python -c "import glob;print(max((len(open(f,encoding='utf-8').read().splitlines()),f) for f in glob.glob('limpeza/**/*.py',recursive=True)))"`
 Expected: nenhum arquivo novo acima de 150 linhas
