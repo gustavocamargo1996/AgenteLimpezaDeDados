@@ -23,7 +23,8 @@ def _argumentos(argv=None):
     ap.add_argument("--colunas", default="todas",
                     help="lista separada por virgula, ou 'todas'")
     ap.add_argument("--modelo", default=config.MODELO_LLM)
-    ap.add_argument("--saida", default="runs", help="pasta base onde o run e' escrito")
+    ap.add_argument("--saida", default=os.getenv("SAIDA", "runs"),
+                    help="pasta base onde o run e' escrito (ou a variavel SAIDA)")
     ap.add_argument("--iteracoes-deteccao", type=int, default=config.ITERACOES_DETECCAO,
                     dest="iteracoes_deteccao",
                     help="iteracoes de refinamento da deteccao com oraculo. "

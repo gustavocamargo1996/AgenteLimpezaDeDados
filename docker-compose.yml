@@ -1,0 +1,37 @@
+services:
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama-modelos:/root/.ollama
+    restart: unless-stopped
+    # Acesso a GPU depende de configuracao no host, feita por quem administra.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{capabilities: [gpu]}]
+
+  arquivos:
+    image: filebrowser/filebrowser
+    volumes:
+      - limpeza-dados:/srv
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  poc:
+    build: .
+    environment:
+      PROVEDOR: ollama
+      OLLAMA_URL: http://ollama:11434
+      MODELO_LLM: qwen2.5-coder:14b
+      SUJO: /dados/entrada_dirty.csv
+      LIMPO: /dados/entrada_clean.csv
+      SAIDA: /dados/runs
+    volumes:
+      - limpeza-dados:/dados
+    depends_on: [ollama]
+    restart: "no"
+
+volumes:
+  ollama-modelos:
+  limpeza-dados:

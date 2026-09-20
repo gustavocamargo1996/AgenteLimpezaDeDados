@@ -271,3 +271,11 @@ def test_sem_argumento_e_sem_variavel_e_erro(monkeypatch):
     monkeypatch.delenv("LIMPO", raising=False)
     with pytest.raises(SystemExit):
         cli._argumentos([])
+
+
+def test_saida_sai_do_ambiente(monkeypatch):
+    """A variavel SAIDA supre o argumento --saida."""
+    monkeypatch.setenv("SUJO", "/d/a.csv")
+    monkeypatch.setenv("LIMPO", "/d/b.csv")
+    monkeypatch.setenv("SAIDA", "/dados/runs")
+    assert cli._argumentos([]).saida == "/dados/runs"
