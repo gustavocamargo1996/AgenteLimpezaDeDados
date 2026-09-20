@@ -1,0 +1,301 @@
+City,State,Country,Climate_Zone,Monitoring_Station_ID,PM2.5,Temperature,Measurement_Date,Project_Name,Eco_Status,index
+Munich,BY,Germany,Temperate,Munich_001,71.18,22.2,2022-10-05,SteelBlue North Initiative 2016,Ecosystem Vulnerable - Common those billion seem.,0
+Bangalore,KA,India,Tropical,Bangalore_001,81.52,30.2,2024-05-19,Salmon Thing Initiative 2021,Ecosystem Recovering - Upon almost figure common.,1
+New York,NY,United States,Temperate,NewYork_001,130.96,15.2,2023-04-19,PaleVioletRed Create Initiative 2018,Ecosystem Recovering - Account trial two sign loss Congress.,2
+Munich,BY,Germany,Temperate,Munich_002,95.67,-5.3,2023-06-20,Yellow Watch Initiative 2017,Ecosystem Stable - Court city them fish wall hope carry.,3
+Mumbai,MH,India,Tropical,Mumbai_001,142.27,23.8,2024-06-17,Aquamarine Science Initiative 2020,Ecosystem Stable - Summer note accept detail.,4
+Berlin,BE,Germany,Temperate,Berlin_001,130.15,2.0,2022-04-20,Lime Begin Initiative 2021,Ecosystem Stable - Light eat foot example.,5
+Los Angeles,CA,United States,Temperate,LosAngeles_001,154.25,3.6,2020-04-02,Tomato Miss Initiative 2017,Ecosystem Vulnerable - Spend case half maintain result campaign short.,6
+Munich,BY,Germany,Temperate,Munich_003,188.73,20.8,2020-07-05,Ivory Day Initiative 2023,Ecosystem Vulnerable - Economy interest keep him into maybe contain.,7
+Los Angeles,CA,United States,Temperate,LosAngeles_002,23.7,26.0,2024-08-31,PaleGoldenRod Market Initiative 2021,Ecosystem Vulnerable - Civil simple tree.,8
+Hamburg,HH,Germany,Temperate,Hamburg_001,83.25,19.5,2021-08-03,Maroon Officer Initiative 2012,Ecosystem Vulnerable - Represent evening range what tonight between.,9
+Munich,BY,Germany,Temperate,Munich_004,133.12,32.8,2023-06-22,Teal Remain Initiative 2016,Ecosystem Vulnerable - Address compare prove front religious position school.,10
+Chicago,IL,United States,Temperate,Chicago_001,167.12,8.5,2022-10-16,DarkMagenta Win Initiative 2015,Ecosystem Recovering - Significant thus play.,11
+Mumbai,MH,India,Tropical,Mumbai_002,55.1,37.2,2021-05-13,LightGray Represent Initiative 2018,Ecosystem Vulnerable - Must left organization local field.,12
+Los Angeles,CA,United States,Temperate,LosAngeles_003,132.44,8.6,2022-03-12,Azure Citizen Initiative 2018,Ecosystem Vulnerable - Reality than eight field our big wear.,13
+Berlin,BE,Germany,Temperate,Berlin_002,96.57,15.7,2022-04-25,Maroon Whether Initiative 2014,Ecosystem Stable - Real hair detail ask assume upon history.,14
+Los Angeles,CA,United States,Temperate,LosAngeles_004,27.05,21.2,2024-11-04,Orchid Lawyer Initiative 2012,Ecosystem Recovering - Develop various left.,15
+Bangalore,KA,India,Tropical,Bangalore_002,109.64,24.2,2021-05-04,Coral Also Initiative 2010,Ecosystem Vulnerable - Political do about.,16
+Mumbai,MH,India,Tropical,Mumbai_003,72.6,36.7,2021-04-16,GoldenRod Owner Initiative 2019,Ecosystem Stable - Game could last leg else help.,17
+Berlin,BE,Germany,Temperate,Berlin_003,98.02,14.5,2024-01-17,Yellow Board Initiative 2018,Ecosystem Recovering - Pass attention security military both.,18
+Hamburg,HH,Germany,Temperate,Hamburg_002,37.38,-7.3,2021-12-19,DodgerBlue Goal Initiative 2014,Ecosystem Recovering - Themselves sense build international.,19
+Bangalore,KA,India,Tropical,Bangalore_003,101.11,17.7,2021-07-14,Pink Fall Initiative 2023,Ecosystem Vulnerable - Establish study ten true exist.,20
+Chicago,IL,United States,Temperate,Chicago_002,85.76,30.1,2020-05-07,DarkSalmon Step Initiative 2011,Ecosystem Vulnerable - Color really road then entire position.,21
+Mumbai,MH,India,Tropical,Mumbai_004,58.36,37.8,2023-02-03,Tan Cost Initiative 2019,Ecosystem Stable - Responsibility also stand or.,22
+Delhi,DL,India,Tropical,Delhi_001,105.95,38.1,2020-07-15,DarkGreen Because Initiative 2018,Ecosystem Vulnerable - Federal arm worker church happy.,23
+Delhi,DL,India,Tropical,Delhi_002,110.84,17.6,2024-04-02,SkyBlue Wrong Initiative 2011,Ecosystem Vulnerable - Draw position key star threat.,24
+Chicago,IL,United States,Temperate,Chicago_003,130.42,11.2,2023-11-13,MediumSpringGreen Truth Initiative 2023,Ecosystem Stable - Example step security such site thought to.,25
+Delhi,DL,India,Tropical,Delhi_003,153.01,28.4,2021-12-29,LightSeaGreen Person Initiative 2020,Ecosystem Stable - Southern best ask police.,26
+Hamburg,HH,Germany,Temperate,Hamburg_003,141.47,20.0,2021-10-10,MediumPurple Oil Initiative 2022,Ecosystem Vulnerable - Capital sign along pick another many with.,27
+Berlin,BE,Germany,Temperate,Berlin_004,172.4,22.5,2022-04-03,LightSalmon Course Initiative 2014,Ecosystem Recovering - Once best later bill.,28
+Delhi,DL,India,Tropical,Delhi_004,139.38,16.2,2022-12-25,DodgerBlue Society Initiative 2018,Ecosystem Stable - Include mention idea production cover thank artist.,29
+Hamburg,HH,Germany,Temperate,Hamburg_004,75.57,28.6,2024-12-09,Lime Affect Initiative 2015,Ecosystem Stable - Here mention anyone receive for his.,30
+Hamburg,HH,Germany,Temperate,Hamburg_005,70.03,24.4,2024-05-25,MediumTurquoise Hundred Initiative 2014,Ecosystem Recovering - Real citizen feeling key head detail.,31
+Mumbai,MH,India,Tropical,Mumbai_005,62.34,30.2,2022-09-01,Aqua Could Initiative 2013,Ecosystem Stable - Remember until particularly check challenge mention.,32
+Mumbai,MH,India,Tropical,Mumbai_006,89.4,21.3,2024-06-10,BlanchedAlmond Enter Initiative 2020,Ecosystem Vulnerable - Development agreement north school hour free hope play.,33
+Hamburg,HH,Germany,Temperate,Hamburg_006,128.0,1.5,2023-02-12,Peru Price Initiative 2018,Ecosystem Vulnerable - Else budget visit computer shoulder.,34
+Hamburg,HH,Germany,Temperate,Hamburg_007,75.06,26.7,2021-12-05,YellowGreen While Initiative 2013,Ecosystem Recovering - Company more next officer character.,35
+Berlin,BE,Germany,Temperate,Berlin_005,30.23,22.2,2025-01-31,Salmon Operation Initiative 2012,Ecosystem Recovering - Part smile mention mouth environmental ground change.,36
+Hamburg,HH,Germany,Temperate,Hamburg_008,55.71,-8.9,2023-02-26,Teal Discussion Initiative 2021,Ecosystem Vulnerable - Commercial share politics civil always character employee.,37
+Hamburg,HH,Germany,Temperate,Hamburg_009,22.58,12.1,2022-08-11,SeaShell Citizen Initiative 2020,Ecosystem Vulnerable - Go you the statement speech.,38
+Los Angeles,CA,United States,Temperate,LosAngeles_005,120.81,-3.1,2022-04-10,GreenYellow Drug Initiative 2022,Ecosystem Vulnerable - Power coach center forward.,39
+Berlin,BE,Germany,Temperate,Berlin_006,198.12,19.1,2023-10-06,SlateGray Think Initiative 2012,Ecosystem Vulnerable - Southern put defense base.,40
+Delhi,DL,India,Tropical,Delhi_005,198.64,37.2,2025-01-07,Gold Thank Initiative 2012,Ecosystem Recovering - Prevent but during.,41
+Munich,BY,Germany,Temperate,Munich_005,10.25,-0.0,2020-10-28,DarkViolet Term Initiative 2016,Ecosystem Recovering - Light direction clear eat sister accept.,42
+Hamburg,HH,Germany,Temperate,Hamburg_010,44.44,12.1,2025-02-03,MediumAquaMarine Prepare Initiative 2010,Ecosystem Recovering - Recognize senior Congress build.,43
+Bangalore,KA,India,Tropical,Bangalore_004,31.59,28.3,2022-02-02,Aquamarine Small Initiative 2014,Ecosystem Recovering - Impact light fund season easy international matter prevent.,44
+Bangalore,KA,India,Tropical,Bangalore_005,103.94,15.8,2023-06-22,FireBrick Man Initiative 2015,Ecosystem Recovering - About fund once he.,45
+Bangalore,KA,India,Tropical,Bangalore_006,97.99,25.6,2023-05-04,Fuchsia Chair Initiative 2012,Ecosystem Stable - Cost animal card medical chance bank.,46
+Delhi,DL,India,Tropical,Delhi_006,125.07,41.8,2023-08-26,ForestGreen Knowledge Initiative 2010,Ecosystem Stable - Would personal west realize tend.,47
+New York,NY,United States,Temperate,NewYork_002,63.68,14.8,2024-04-05,Gray Issue Initiative 2023,Ecosystem Recovering - Partner near into dark.,48
+Los Angeles,CA,United States,Temperate,LosAngeles_006,49.71,11.8,2022-10-03,DarkSlateBlue Lawyer Initiative 2018,Ecosystem Vulnerable - Work very less level recent.,49
+Chicago,IL,United States,Temperate,Chicago_004,148.94,27.7,2020-06-17,Gold College Initiative 2015,Ecosystem Stable - Third too billion world.,50
+New York,NY,United States,Temperate,NewYork_003,36.49,35.0,2022-08-19,DarkGreen Address Initiative 2015,Ecosystem Stable - Degree war north worry according case.,51
+Los Angeles,CA,United States,Temperate,LosAngeles_007,85.68,6.7,2020-07-21,Gainsboro Relate Initiative 2023,Ecosystem Stable - Miss home know owner military from raise.,52
+Los Angeles,CA,United States,Temperate,LosAngeles_008,18.15,4.3,2024-05-15,AliceBlue Step Initiative 2012,Ecosystem Recovering - Vote sell ever government poor best cover car.,53
+Hamburg,HH,Germany,Temperate,Hamburg_011,74.05,-9.4,2021-05-09,Chartreuse Available Initiative 2015,Ecosystem Recovering - President air clear last training send.,54
+Munich,BY,Germany,Temperate,Munich_006,19.35,24.6,2020-11-21,MediumSeaGreen Market Initiative 2023,Ecosystem Stable - May but house require.,55
+Bangalore,KA,India,Tropical,Bangalore_007,104.9,19.9,2025-02-12,Azure Tv Initiative 2011,Ecosystem Recovering - Trouble chance yet tend car computer.,56
+Munich,BY,Germany,Temperate,Munich_007,61.7,24.5,2022-08-30,DarkSeaGreen Usually Initiative 2014,Ecosystem Stable - Way human than animal they pattern away create.,57
+Los Angeles,CA,United States,Temperate,LosAngeles_009,114.31,27.3,2021-05-06,DarkGray Investment Initiative 2017,Ecosystem Stable - Week yard well ball early.,58
+Los Angeles,CA,United States,Temperate,LosAngeles_010,53.35,33.4,2022-02-23,DarkGoldenRod Mention Initiative 2015,Ecosystem Stable - Maybe born none goal.,59
+Berlin,BE,Germany,Temperate,Berlin_007,172.77,10.7,2021-08-11,DarkRed Near Initiative 2023,Ecosystem Stable - Score because student home.,60
+Chicago,IL,United States,Temperate,Chicago_005,195.25,29.5,2024-05-27,RosyBrown Cover Initiative 2021,Ecosystem Vulnerable - Process center section mean bill.,61
+Munich,BY,Germany,Temperate,Munich_008,163.75,14.3,2024-01-01,Yellow Mother Initiative 2018,Ecosystem Recovering - Country truth learn feeling clearly good song sure.,62
+Chicago,IL,United States,Temperate,Chicago_006,157.62,0.5,2024-03-21,LightSteelBlue Price Initiative 2018,Ecosystem Recovering - National here quickly blood agreement something serious.,63
+Munich,BY,Germany,Temperate,Munich_009,48.68,-4.8,2021-12-15,DeepPink Simple Initiative 2014,Ecosystem Stable - Debate store thank certain.,64
+Bangalore,KA,India,Tropical,Bangalore_008,54.78,44.8,2022-04-17,BlueViolet Student Initiative 2010,Ecosystem Vulnerable - Whether listen to Republican health.,65
+Mumbai,MH,India,Tropical,Mumbai_007,155.38,26.6,2024-11-21,Cyan Language Initiative 2010,Ecosystem Recovering - Year against few approach check.,66
+Bangalore,KA,India,Tropical,Bangalore_009,144.92,31.6,2020-11-20,Salmon Environment Initiative 2017,Ecosystem Recovering - Similar sometimes image financial north.,67
+Delhi,DL,India,Tropical,Delhi_007,174.8,18.8,2021-04-01,GoldenRod Him Initiative 2016,Ecosystem Vulnerable - Coach air institution main those any one mother.,68
+Munich,BY,Germany,Temperate,Munich_010,127.39,14.6,2024-10-02,YellowGreen Race Initiative 2015,Ecosystem Vulnerable - Sport popular ready significant himself take.,69
+Delhi,DL,India,Tropical,Delhi_008,72.27,44.7,2023-01-19,Gainsboro Model Initiative 2015,Ecosystem Recovering - Feel tough occur front say friend.,70
+Chicago,IL,United States,Temperate,Chicago_007,30.06,22.6,2022-08-15,MediumTurquoise Save Initiative 2011,Ecosystem Stable - Civil beautiful laugh black turn.,71
+Hamburg,HH,Germany,Temperate,Hamburg_012,103.48,23.4,2020-09-08,LightSteelBlue Political Initiative 2021,Ecosystem Recovering - Such grow knowledge issue reality.,72
+New York,NY,United States,Temperate,NewYork_004,13.48,34.9,2022-10-29,SeaShell Everybody Initiative 2013,Ecosystem Vulnerable - Believe every under particularly term know debate.,73
+Munich,BY,Germany,Temperate,Munich_011,27.29,23.5,2021-03-23,Green Wrong Initiative 2023,Ecosystem Vulnerable - Approach across success.,74
+Delhi,DL,India,Tropical,Delhi_009,142.11,17.4,2024-07-28,DeepSkyBlue Agency Initiative 2010,Ecosystem Vulnerable - Security religious say quickly computer.,75
+Los Angeles,CA,United States,Temperate,LosAngeles_011,176.96,5.5,2021-09-17,Beige Century Initiative 2022,Ecosystem Recovering - Statement dream nothing important reality past particularly difference.,76
+New York,NY,United States,Temperate,NewYork_005,178.25,26.8,2023-03-12,Beige Partner Initiative 2018,Ecosystem Vulnerable - Fund far large financial push foreign station soon.,77
+Berlin,BE,Germany,Temperate,Berlin_008,62.71,29.2,2021-10-10,MediumPurple Question Initiative 2015,Ecosystem Stable - Sure keep something key add management.,78
+Los Angeles,CA,United States,Temperate,LosAngeles_012,110.35,16.4,2020-11-21,Cornsilk Number Initiative 2016,Ecosystem Stable - Break necessary wrong these.,79
+Mumbai,MH,India,Tropical,Mumbai_008,68.7,32.9,2023-06-04,Turquoise Local Initiative 2010,Ecosystem Stable - Our information glass prepare discuss simple ability.,80
+Bangalore,KA,India,Tropical,Bangalore_010,127.42,34.6,2022-11-06,SkyBlue Movement Initiative 2021,Ecosystem Stable - Thank organization onto throughout even watch.,81
+Munich,BY,Germany,Temperate,Munich_012,121.84,-6.6,2024-05-22,DarkTurquoise Rich Initiative 2015,Ecosystem Vulnerable - Put specific morning at walk.,82
+Munich,BY,Germany,Temperate,Munich_013,96.27,18.9,2023-07-05,Cornsilk Play Initiative 2022,Ecosystem Recovering - Sense camera during necessary no notice ground wall.,83
+Los Angeles,CA,United States,Temperate,LosAngeles_013,42.42,-3.3,2023-03-22,DarkSalmon Candidate Initiative 2012,Ecosystem Recovering - Often six federal agent public.,84
+Los Angeles,CA,United States,Temperate,LosAngeles_014,159.3,-4.7,2022-04-08,Plum Way Initiative 2011,Ecosystem Recovering - Report all under through.,85
+Mumbai,MH,India,Tropical,Mumbai_009,30.85,28.2,2023-08-08,Coral Certain Initiative 2015,Ecosystem Vulnerable - Stuff recently home.,86
+Mumbai,MH,India,Tropical,Mumbai_010,95.14,33.3,2024-04-28,Crimson Toward Initiative 2023,Ecosystem Stable - Artist list soon minute life.,87
+Delhi,DL,India,Tropical,Delhi_010,129.65,23.3,2021-04-10,SeaShell Magazine Initiative 2019,Ecosystem Vulnerable - Win civil treatment kid number.,88
+Los Angeles,CA,United States,Temperate,LosAngeles_015,36.27,-5.7,2023-03-26,RosyBrown Several Initiative 2018,Ecosystem Recovering - Produce trip may employee teacher might federal.,89
+Chicago,IL,United States,Temperate,Chicago_008,94.66,-5.1,2021-11-27,Sienna Grow Initiative 2022,Ecosystem Vulnerable - Care cover item major man mission.,90
+Mumbai,MH,India,Tropical,Mumbai_011,80.75,42.0,2020-07-08,Gainsboro Big Initiative 2021,Ecosystem Vulnerable - Piece movie not whose view.,91
+Delhi,DL,India,Tropical,Delhi_011,48.99,36.5,2021-09-22,White Must Initiative 2022,Ecosystem Recovering - Kind bit test defense.,92
+New York,NY,United States,Temperate,NewYork_006,122.41,12.9,2020-09-22,SkyBlue News Initiative 2011,Ecosystem Stable - Recently spend middle push enter.,93
+Berlin,BE,Germany,Temperate,Berlin_009,174.06,10.1,2020-08-31,Aqua Race Initiative 2023,Ecosystem Recovering - Wrong class media them even.,94
+Hamburg,HH,Germany,Temperate,Hamburg_013,18.33,7.0,2021-08-08,RoyalBlue May Initiative 2021,Ecosystem Stable - All watch product these another movement.,95
+New York,NY,United States,Temperate,NewYork_007,59.15,16.3,2024-05-08,Fuchsia Just Initiative 2017,Ecosystem Stable - Accept with list second.,96
+Chicago,IL,United States,Temperate,Chicago_009,20.83,4.9,2021-04-14,Lavender Upon Initiative 2012,Ecosystem Stable - Character child upon.,97
+Hamburg,HH,Germany,Temperate,Hamburg_014,123.28,13.3,2021-11-08,Silver Relate Initiative 2011,Ecosystem Vulnerable - Future finish most development official home.,98
+Chicago,IL,United States,Temperate,Chicago_010,81.34,20.0,2024-08-21,GhostWhite Mind Initiative 2019,Ecosystem Vulnerable - White throughout with in look budget.,99
+Bangalore,KA,India,Tropical,Bangalore_011,30.09,35.5,2024-12-23,Beige Technology Initiative 2021,Ecosystem Vulnerable - Product reflect hold situation save.,100
+Munich,BY,Germany,Temperate,Munich_014,59.87,22.0,2022-07-13,LawnGreen Process Initiative 2011,Ecosystem Vulnerable - Kitchen fact worry buy wait need food.,101
+Mumbai,MH,India,Tropical,Mumbai_012,197.99,33.0,2023-11-07,MediumSpringGreen Paper Initiative 2020,Ecosystem Vulnerable - Soldier represent citizen imagine wear maybe.,102
+Delhi,DL,India,Tropical,Delhi_012,14.31,24.6,2020-05-18,Aqua Nothing Initiative 2010,Ecosystem Recovering - Management security poor professor lawyer.,103
+Delhi,DL,India,Tropical,Delhi_013,111.7,27.5,2023-06-01,PaleTurquoise Poor Initiative 2012,Ecosystem Stable - Fear among defense somebody occur tree.,104
+Chicago,IL,United States,Temperate,Chicago_011,171.7,27.5,2020-09-21,MistyRose Art Initiative 2017,Ecosystem Vulnerable - Soon stand much relate involve.,105
+Hamburg,HH,Germany,Temperate,Hamburg_015,135.63,31.4,2023-01-21,LightPink Skill Initiative 2018,Ecosystem Stable - Back cost bill instead.,106
+Mumbai,MH,India,Tropical,Mumbai_013,107.12,28.3,2022-07-05,LightSteelBlue Hard Initiative 2022,Ecosystem Recovering - Economic action ask could above.,107
+Munich,BY,Germany,Temperate,Munich_015,105.74,20.6,2023-02-14,LemonChiffon Road Initiative 2022,Ecosystem Stable - Community land yet miss camera actually big.,108
+Berlin,BE,Germany,Temperate,Berlin_010,66.25,25.3,2022-11-24,LightSkyBlue Above Initiative 2011,Ecosystem Stable - Head occur artist amount.,109
+Chicago,IL,United States,Temperate,Chicago_012,69.54,16.8,2023-10-15,PowderBlue Partner Initiative 2019,Ecosystem Stable - Vote draw future space.,110
+Delhi,DL,India,Tropical,Delhi_014,108.86,26.7,2022-09-05,Peru Maintain Initiative 2022,Ecosystem Stable - Likely without also of investment quickly low.,111
+Chicago,IL,United States,Temperate,Chicago_013,195.72,22.4,2021-02-16,Brown Order Initiative 2017,Ecosystem Vulnerable - Material off identify together drop.,112
+New York,NY,United States,Temperate,NewYork_008,136.1,30.2,2023-04-25,PeachPuff Official Initiative 2012,Ecosystem Stable - Late stuff few management feeling professor.,113
+Mumbai,MH,India,Tropical,Mumbai_014,109.83,32.6,2024-06-05,Black Total Initiative 2016,Ecosystem Vulnerable - Boy kind stock up wall style.,114
+Los Angeles,CA,United States,Temperate,LosAngeles_016,64.75,-7.9,2022-10-31,DarkOrange Lawyer Initiative 2014,Ecosystem Recovering - Future factor front.,115
+Munich,BY,Germany,Temperate,Munich_016,14.14,16.3,2022-10-10,MintCream Effect Initiative 2017,Ecosystem Recovering - Center central career value court describe alone stay.,116
+Hamburg,HH,Germany,Temperate,Hamburg_016,141.62,20.8,2021-05-19,BurlyWood Miss Initiative 2011,Ecosystem Recovering - One write find institution specific.,117
+Los Angeles,CA,United States,Temperate,LosAngeles_017,110.67,11.9,2023-08-18,MistyRose Wear Initiative 2015,Ecosystem Recovering - Gas defense office design.,118
+Chicago,IL,United States,Temperate,Chicago_014,46.58,14.1,2022-10-28,AliceBlue Group Initiative 2018,Ecosystem Vulnerable - Five team practice actually north.,119
+Delhi,DL,India,Tropical,Delhi_015,134.8,27.4,2024-08-26,Indigo One Initiative 2013,Ecosystem Recovering - Visit surface speech business investment range.,120
+Hamburg,HH,Germany,Temperate,Hamburg_017,44.42,2.1,2021-09-09,Teal Between Initiative 2013,Ecosystem Recovering - Impact boy your bad call national.,121
+Bangalore,KA,India,Tropical,Bangalore_012,120.34,30.2,2023-06-03,MidnightBlue Affect Initiative 2014,Ecosystem Vulnerable - Thus fill just paper.,122
+Munich,BY,Germany,Temperate,Munich_017,112.69,2.9,2021-02-18,Azure Make Initiative 2016,Ecosystem Stable - Mission kid we public.,123
+Mumbai,MH,India,Tropical,Mumbai_015,97.14,44.7,2023-02-20,SteelBlue Letter Initiative 2021,Ecosystem Recovering - Clearly development less in yet serious.,124
+Munich,BY,Germany,Temperate,Munich_018,35.47,13.2,2022-07-03,DarkTurquoise Brother Initiative 2019,Ecosystem Recovering - Decision you like treatment issue state specific.,125
+Munich,BY,Germany,Temperate,Munich_019,187.62,19.0,2023-07-05,FireBrick Peace Initiative 2018,Ecosystem Recovering - Myself build morning.,126
+Los Angeles,CA,United States,Temperate,LosAngeles_018,194.81,2.9,2024-07-30,Peru Film Initiative 2017,Ecosystem Vulnerable - Off perhaps bad lay.,127
+Berlin,BE,Germany,Temperate,Berlin_011,83.06,13.9,2022-02-08,DarkSeaGreen Your Initiative 2016,Ecosystem Vulnerable - Several as order consumer than property.,128
+Bangalore,KA,India,Tropical,Bangalore_013,199.84,22.7,2021-01-22,SandyBrown Manage Initiative 2015,Ecosystem Recovering - Else should old several ok generation education.,129
+Berlin,BE,Germany,Temperate,Berlin_012,102.95,23.9,2023-10-28,Salmon Tough Initiative 2019,Ecosystem Vulnerable - During around technology ever drop wish.,130
+Mumbai,MH,India,Tropical,Mumbai_016,180.37,16.7,2020-11-21,Gray Image Initiative 2018,Ecosystem Stable - Million about must because community its.,131
+Munich,BY,Germany,Temperate,Munich_020,10.25,-1.9,2023-10-20,DarkSalmon Serious Initiative 2014,Ecosystem Stable - Enter leader religious effort smile order check.,132
+New York,NY,United States,Temperate,NewYork_009,38.63,34.4,2020-09-20,MediumAquaMarine Road Initiative 2016,Ecosystem Stable - Color feel relationship military option.,133
+Bangalore,KA,India,Tropical,Bangalore_014,150.07,35.1,2020-09-10,YellowGreen Education Initiative 2021,Ecosystem Stable - Meet middle entire feeling hot sea let.,134
+Los Angeles,CA,United States,Temperate,LosAngeles_019,146.94,22.5,2021-04-07,DarkGoldenRod Speech Initiative 2010,Ecosystem Recovering - Remain fund late product understand pick.,135
+Munich,BY,Germany,Temperate,Munich_021,131.33,18.7,2024-09-10,CornflowerBlue Special Initiative 2013,Ecosystem Stable - Through make age later red report.,136
+New York,NY,United States,Temperate,NewYork_010,123.5,-9.8,2020-03-12,Yellow Difficult Initiative 2023,Ecosystem Vulnerable - Wide imagine wish ever company human thus walk.,137
+Mumbai,MH,India,Tropical,Mumbai_017,89.52,26.6,2021-06-14,OldLace Stock Initiative 2014,Ecosystem Vulnerable - Hour much set scene.,138
+Los Angeles,CA,United States,Temperate,LosAngeles_020,135.63,-7.3,2023-08-17,SpringGreen Ahead Initiative 2015,Ecosystem Vulnerable - Myself sister partner necessary ground director forward.,139
+Los Angeles,CA,United States,Temperate,LosAngeles_021,157.39,12.2,2023-05-03,SkyBlue Step Initiative 2012,Ecosystem Vulnerable - Within newspaper garden federal deep cold.,140
+Bangalore,KA,India,Tropical,Bangalore_015,76.75,43.8,2022-11-05,SpringGreen National Initiative 2010,Ecosystem Recovering - For left push sign discussion study.,141
+Bangalore,KA,India,Tropical,Bangalore_016,176.78,25.3,2020-12-17,DeepPink Anything Initiative 2022,Ecosystem Recovering - Yes hard lose ability picture attack.,142
+Los Angeles,CA,United States,Temperate,LosAngeles_022,131.22,26.1,2024-10-25,LightYellow Instead Initiative 2013,Ecosystem Vulnerable - Spring program kind should.,143
+Hamburg,HH,Germany,Temperate,Hamburg_018,28.94,3.1,2022-08-31,SlateGray Message Initiative 2016,Ecosystem Stable - This condition fund type voice.,144
+Hamburg,HH,Germany,Temperate,Hamburg_019,182.08,34.4,2024-06-19,Brown Again Initiative 2020,Ecosystem Stable - Threat tonight with media consider.,145
+Chicago,IL,United States,Temperate,Chicago_015,123.45,22.2,2021-06-23,PaleVioletRed Model Initiative 2013,Ecosystem Recovering - Security court country.,146
+Chicago,IL,United States,Temperate,Chicago_016,60.82,30.2,2023-05-01,SeaShell He Initiative 2016,Ecosystem Stable - Back stand control.,147
+Delhi,DL,India,Tropical,Delhi_016,174.13,33.0,2025-01-05,LightSkyBlue Of Initiative 2020,Ecosystem Stable - Or who administration effect vote.,148
+Bangalore,KA,India,Tropical,Bangalore_017,70.13,17.9,2021-03-27,PeachPuff Light Initiative 2022,Ecosystem Stable - Behind here remember page industry.,149
+Hamburg,HH,Germany,Temperate,Hamburg_020,10.25,30.8,2023-04-01,DarkCyan Leg Initiative 2013,Ecosystem Recovering - Stop far international your.,150
+Los Angeles,CA,United States,Temperate,LosAngeles_023,141.0,7.5,2020-12-01,PeachPuff Grow Initiative 2013,Ecosystem Stable - Painting particular many sing.,151
+New York,NY,United States,Temperate,NewYork_011,86.93,-1.2,2023-10-18,GoldenRod Event Initiative 2020,Ecosystem Stable - Sign across effect.,152
+Munich,BY,Germany,Temperate,Munich_022,53.49,8.0,2022-01-04,PowderBlue Sport Initiative 2021,Ecosystem Recovering - Ground others from benefit source television boy.,153
+Chicago,IL,United States,Temperate,Chicago_017,30.45,-2.3,2024-06-20,DimGray Gas Initiative 2020,Ecosystem Recovering - Build stop support second language exist they.,154
+Berlin,BE,Germany,Temperate,Berlin_013,140.39,29.1,2023-09-22,DimGray Watch Initiative 2011,Ecosystem Recovering - Condition consider war every dinner quickly.,155
+Munich,BY,Germany,Temperate,Munich_023,60.93,29.7,2023-01-13,DeepSkyBlue National Initiative 2018,Ecosystem Vulnerable - Trade yourself clearly knowledge price or too family.,156
+Hamburg,HH,Germany,Temperate,Hamburg_021,36.1,12.7,2023-12-25,Tomato Weight Initiative 2023,Ecosystem Stable - Simple try stock natural happy collection tend.,157
+Chicago,IL,United States,Temperate,Chicago_018,180.45,12.1,2020-02-28,Purple Play Initiative 2014,Ecosystem Vulnerable - Medical skin including main beautiful part.,158
+Munich,BY,Germany,Temperate,Munich_024,70.03,-3.3,2021-01-23,SkyBlue Easy Initiative 2011,Ecosystem Vulnerable - Program color read notice evening.,159
+Mumbai,MH,India,Tropical,Mumbai_018,10.32,28.3,2023-10-30,DarkSeaGreen Work Initiative 2016,Ecosystem Recovering - Behind assume area commercial eight school case civil.,160
+Chicago,IL,United States,Temperate,Chicago_019,132.52,19.2,2022-10-26,Brown Indeed Initiative 2014,Ecosystem Stable - Foreign possible weight produce leader.,161
+Mumbai,MH,India,Tropical,Mumbai_019,88.17,30.5,2020-10-20,OliveDrab Sign Initiative 2018,Ecosystem Recovering - Teacher can store six.,162
+Hamburg,HH,Germany,Temperate,Hamburg_022,165.09,12.2,2020-10-26,BlueViolet Spring Initiative 2015,Ecosystem Recovering - Value age someone perform.,163
+Mumbai,MH,India,Tropical,Mumbai_020,73.15,29.1,2022-05-10,Peru Car Initiative 2011,Ecosystem Vulnerable - During believe edge accept phone.,164
+Hamburg,HH,Germany,Temperate,Hamburg_023,136.22,13.0,2022-04-03,DarkRed Herself Initiative 2019,Ecosystem Vulnerable - Front decade anything perhaps.,165
+Berlin,BE,Germany,Temperate,Berlin_014,195.55,22.7,2020-04-19,Orchid Build Initiative 2018,Ecosystem Stable - President blood popular town.,166
+New York,NY,United States,Temperate,NewYork_012,159.77,7.7,2021-10-01,LightBlue Decision Initiative 2023,Ecosystem Recovering - Station despite realize threat cold beautiful beat.,167
+New York,NY,United States,Temperate,NewYork_013,43.69,31.4,2023-12-26,RosyBrown These Initiative 2015,Ecosystem Recovering - Parent together group card way necessary.,168
+Delhi,DL,India,Tropical,Delhi_017,171.6,42.7,2022-11-23,DarkGreen Later Initiative 2016,Ecosystem Stable - Purpose worry have person why senior.,169
+New York,NY,United States,Temperate,NewYork_014,171.96,33.2,2021-01-22,Brown Positive Initiative 2019,Ecosystem Vulnerable - Thank staff carry land on.,170
+Hamburg,HH,Germany,Temperate,Hamburg_024,162.78,-1.8,2023-10-19,Pink Wife Initiative 2012,Ecosystem Vulnerable - East plan back film art show.,171
+Berlin,BE,Germany,Temperate,Berlin_015,97.93,23.5,2024-04-18,PaleTurquoise List Initiative 2017,Ecosystem Stable - Theory community maintain government network program loss college.,172
+Bangalore,KA,India,Tropical,Bangalore_018,23.54,15.4,2020-08-31,LavenderBlush Radio Initiative 2023,Ecosystem Stable - Total should dream affect some protect.,173
+Delhi,DL,India,Tropical,Delhi_018,131.18,40.6,2022-05-23,RoyalBlue Training Initiative 2014,Ecosystem Vulnerable - During vote end mouth book teach.,174
+Chicago,IL,United States,Temperate,Chicago_020,65.27,33.9,2024-03-02,BurlyWood Discover Initiative 2013,Ecosystem Recovering - Adult whom appear beyond government.,175
+New York,NY,United States,Temperate,NewYork_015,47.39,-5.7,2020-04-22,Indigo He Initiative 2017,Ecosystem Vulnerable - Structure become onto public hair fund training again.,176
+Delhi,DL,India,Tropical,Delhi_019,69.75,20.3,2023-06-13,IndianRed However Initiative 2012,Ecosystem Vulnerable - Determine then them score.,177
+Chicago,IL,United States,Temperate,Chicago_021,19.84,13.6,2023-03-07,LightSteelBlue Family Initiative 2014,Ecosystem Vulnerable - Product suddenly ability positive better draw.,178
+Mumbai,MH,India,Tropical,Mumbai_021,36.68,39.7,2024-03-28,Turquoise Above Initiative 2014,Ecosystem Stable - Scene light side budget report each recognize.,179
+Chicago,IL,United States,Temperate,Chicago_022,130.61,22.4,2020-03-05,Coral On Initiative 2015,Ecosystem Recovering - Opportunity program much majority yeah.,180
+Bangalore,KA,India,Tropical,Bangalore_019,47.44,22.4,2023-07-08,GreenYellow Owner Initiative 2013,Ecosystem Recovering - Base police sort by around give.,181
+New York,NY,United States,Temperate,NewYork_016,89.81,11.5,2024-04-09,SeaShell After Initiative 2015,Ecosystem Recovering - Matter Mrs as whom standard.,182
+Chicago,IL,United States,Temperate,Chicago_023,135.26,26.6,2020-06-10,Gray Near Initiative 2023,Ecosystem Vulnerable - Method grow board ok.,183
+Mumbai,MH,India,Tropical,Mumbai_022,174.62,20.2,2020-05-21,GreenYellow Lead Initiative 2014,Ecosystem Recovering - Blood either by practice sea building.,184
+Bangalore,KA,India,Tropical,Bangalore_020,182.25,30.4,2022-07-07,SlateGray Concern Initiative 2023,Ecosystem Stable - Develop benefit total report know music night knowledge.,185
+Hamburg,HH,Germany,Temperate,Hamburg_025,99.81,-5.5,2024-10-14,GoldenRod Game Initiative 2010,Ecosystem Stable - Half use never including.,186
+Berlin,BE,Germany,Temperate,Berlin_016,121.75,9.5,2023-02-04,DarkViolet Study Initiative 2017,Ecosystem Vulnerable - Four trade those until.,187
+Berlin,BE,Germany,Temperate,Berlin_017,194.42,3.2,2020-10-16,LightYellow Military Initiative 2016,Ecosystem Recovering - Mr several lead office officer wide.,188
+Mumbai,MH,India,Tropical,Mumbai_023,117.52,25.9,2024-03-28,DeepSkyBlue Body Initiative 2020,Ecosystem Stable - White sort term.,189
+New York,NY,United States,Temperate,NewYork_017,101.6,3.6,2022-07-18,LimeGreen Fish Initiative 2011,Ecosystem Stable - List woman us new then.,190
+Los Angeles,CA,United States,Temperate,LosAngeles_024,89.75,8.5,2021-06-26,NavajoWhite Lot Initiative 2010,Ecosystem Recovering - Play know per media risk.,191
+Bangalore,KA,India,Tropical,Bangalore_021,36.75,40.0,2021-05-16,LavenderBlush Hotel Initiative 2021,Ecosystem Stable - At large support necessary by.,192
+New York,NY,United States,Temperate,NewYork_018,113.49,26.8,2024-08-30,Navy Degree Initiative 2013,Ecosystem Recovering - Example receive them teach.,193
+Hamburg,HH,Germany,Temperate,Hamburg_026,144.06,7.3,2024-06-27,PaleGoldenRod Door Initiative 2015,Ecosystem Stable - Seek determine also especially.,194
+Berlin,BE,Germany,Temperate,Berlin_018,69.3,19.8,2022-09-18,White Give Initiative 2011,Ecosystem Stable - Coach one subject future situation see I can.,195
+Los Angeles,CA,United States,Temperate,LosAngeles_025,38.83,27.7,2024-01-03,OliveDrab Discover Initiative 2017,Ecosystem Recovering - Girl leader result pick get my.,196
+Los Angeles,CA,United States,Temperate,LosAngeles_026,179.99,11.4,2022-05-30,DeepPink This Initiative 2018,Ecosystem Stable - Win eat my less me because would.,197
+New York,NY,United States,Temperate,NewYork_019,98.8,17.1,2023-06-21,Ivory While Initiative 2012,Ecosystem Vulnerable - Through benefit man thousand Republican ever.,198
+Los Angeles,CA,United States,Temperate,LosAngeles_027,153.33,27.3,2022-01-04,MistyRose Claim Initiative 2012,Ecosystem Stable - Particularly line hot board.,199
+New York,NY,United States,Temperate,NewYork_020,100.6,-4.3,2021-07-31,Tan Reach Initiative 2011,Ecosystem Stable - Money blood easy.,200
+Bangalore,KA,India,Tropical,Bangalore_022,89.69,44.1,2023-08-29,OliveDrab Really Initiative 2017,Ecosystem Vulnerable - Third yourself movie such husband method.,201
+Munich,BY,Germany,Temperate,Munich_025,169.33,3.4,2024-05-29,Plum Else Initiative 2021,Ecosystem Stable - Lead everything campaign make even high.,202
+Hamburg,HH,Germany,Temperate,Hamburg_027,141.14,-4.9,2022-05-25,Peru Family Initiative 2015,Ecosystem Vulnerable - Perhaps such force build be commercial.,203
+New York,NY,United States,Temperate,NewYork_021,18.63,25.8,2023-11-03,Linen Response Initiative 2022,Ecosystem Stable - Have especially share.,204
+Munich,BY,Germany,Temperate,Munich_026,192.28,2.1,2021-07-26,Wheat Guy Initiative 2012,Ecosystem Stable - Agency offer risk sense own knowledge put production.,205
+Mumbai,MH,India,Tropical,Mumbai_024,169.91,43.6,2023-04-05,OrangeRed Simply Initiative 2015,Ecosystem Vulnerable - Whose spring teacher.,206
+Chicago,IL,United States,Temperate,Chicago_024,180.17,22.4,2025-02-09,DarkCyan Time Initiative 2021,Ecosystem Vulnerable - Pm on space bill people out policy economic.,207
+Bangalore,KA,India,Tropical,Bangalore_023,177.77,44.8,2023-12-07,MediumOrchid Oil Initiative 2020,Ecosystem Vulnerable - Just amount individual economy.,208
+New York,NY,United States,Temperate,NewYork_022,107.74,18.9,2021-02-22,FloralWhite Ready Initiative 2019,Ecosystem Stable - What answer but.,209
+Los Angeles,CA,United States,Temperate,LosAngeles_028,181.27,-8.9,2020-03-21,Olive Enjoy Initiative 2022,Ecosystem Recovering - East relate shake art reach create.,210
+New York,NY,United States,Temperate,NewYork_023,17.17,28.1,2023-08-21,ForestGreen Agency Initiative 2010,Ecosystem Recovering - Start upon without attention.,211
+Los Angeles,CA,United States,Temperate,LosAngeles_029,40.89,-8.5,2023-12-03,Lavender Better Initiative 2014,Ecosystem Recovering - Into recent where beat field affect child.,212
+Los Angeles,CA,United States,Temperate,LosAngeles_030,179.83,32.4,2020-03-30,YellowGreen Big Initiative 2020,Ecosystem Stable - Up quickly explain black.,213
+Mumbai,MH,India,Tropical,Mumbai_025,84.21,15.7,2021-09-19,Gray Raise Initiative 2021,Ecosystem Vulnerable - Pretty arrive film.,214
+Hamburg,HH,Germany,Temperate,Hamburg_028,161.83,25.8,2020-06-29,SlateGray Material Initiative 2019,Ecosystem Recovering - Pick guy citizen.,215
+Berlin,BE,Germany,Temperate,Berlin_019,56.81,-0.3,2022-07-02,DarkOliveGreen Couple Initiative 2019,Ecosystem Vulnerable - Long artist campaign son among rich summer.,216
+Delhi,DL,India,Tropical,Delhi_020,61.69,24.5,2020-04-28,Cornsilk Cut Initiative 2023,Ecosystem Recovering - His above upon movement.,217
+New York,NY,United States,Temperate,NewYork_024,113.39,16.1,2021-08-12,LightSteelBlue Your Initiative 2011,Ecosystem Recovering - Fish just western cover senior.,218
+Mumbai,MH,India,Tropical,Mumbai_026,135.63,26.3,2025-01-29,Ivory Positive Initiative 2019,Ecosystem Recovering - Cause surface want.,219
+Bangalore,KA,India,Tropical,Bangalore_024,133.61,37.5,2024-01-10,Gray Wife Initiative 2012,Ecosystem Vulnerable - Under toward everybody.,220
+Mumbai,MH,India,Tropical,Mumbai_027,48.08,27.7,2023-07-22,DarkGoldenRod Fund Initiative 2012,Ecosystem Recovering - Accept budget teacher million cold.,221
+Bangalore,KA,India,Tropical,Bangalore_025,80.73,17.0,2020-06-21,Moccasin Affect Initiative 2012,Ecosystem Recovering - Year exactly human per.,222
+Berlin,BE,Germany,Temperate,Berlin_020,145.86,11.1,2020-11-16,PowderBlue Near Initiative 2015,Ecosystem Vulnerable - Increase big its difficult kind.,223
+Los Angeles,CA,United States,Temperate,LosAngeles_031,133.16,10.9,2022-12-17,MediumOrchid Four Initiative 2012,Ecosystem Stable - Change list north down rich lawyer.,224
+Berlin,BE,Germany,Temperate,Berlin_021,121.12,2.6,2024-10-23,DarkOrchid Call Initiative 2015,Ecosystem Recovering - Training off author charge.,225
+Berlin,BE,Germany,Temperate,Berlin_022,177.96,18.8,2020-03-12,Aquamarine Whole Initiative 2023,Ecosystem Stable - Worker call themselves strategy hope people.,226
+Mumbai,MH,India,Tropical,Mumbai_028,85.99,30.2,2021-04-17,LightPink Quite Initiative 2020,Ecosystem Stable - Admit suffer whatever ago real size.,227
+Munich,BY,Germany,Temperate,Munich_027,88.07,2.4,2024-11-24,Navy Field Initiative 2019,Ecosystem Vulnerable - Door appear use account seem election.,228
+Munich,BY,Germany,Temperate,Munich_028,92.24,9.4,2023-08-10,ForestGreen Indicate Initiative 2013,Ecosystem Recovering - Mission get happen couple.,229
+Bangalore,KA,India,Tropical,Bangalore_026,187.35,31.7,2024-09-25,MediumOrchid Whether Initiative 2019,Ecosystem Vulnerable - Police somebody must necessary oil learn.,230
+Bangalore,KA,India,Tropical,Bangalore_027,93.54,21.8,2020-05-13,DarkGray Red Initiative 2023,Ecosystem Stable - Which new above into herself approach at consumer.,231
+New York,NY,United States,Temperate,NewYork_025,87.97,-4.5,2024-09-02,FireBrick Difference Initiative 2012,Ecosystem Vulnerable - Yourself direction size catch whose also.,232
+Los Angeles,CA,United States,Temperate,LosAngeles_032,76.45,21.5,2020-07-01,GoldenRod Into Initiative 2011,Ecosystem Vulnerable - Major coach north back able which difficult.,233
+New York,NY,United States,Temperate,NewYork_026,92.55,18.4,2022-11-14,DarkOrange Model Initiative 2010,Ecosystem Recovering - Sometimes rate military.,234
+Delhi,DL,India,Tropical,Delhi_021,124.78,15.2,2022-07-29,BlanchedAlmond Institution Initiative 2010,Ecosystem Stable - Let skin science.,235
+New York,NY,United States,Temperate,NewYork_027,168.17,27.7,2022-11-23,MidnightBlue Page Initiative 2017,Ecosystem Vulnerable - Answer memory move.,236
+New York,NY,United States,Temperate,NewYork_028,177.86,18.1,2021-12-05,MediumVioletRed Treat Initiative 2015,Ecosystem Stable - Despite particularly character positive those next leave.,237
+Los Angeles,CA,United States,Temperate,LosAngeles_033,22.94,33.0,2022-08-20,NavajoWhite Speak Initiative 2013,Ecosystem Recovering - Blood recognize test.,238
+Delhi,DL,India,Tropical,Delhi_022,42.19,20.3,2022-12-17,RosyBrown I Initiative 2011,Ecosystem Stable - Pass candidate beat all shake drug measure.,239
+Munich,BY,Germany,Temperate,Munich_029,140.0,21.7,2023-09-01,Orange Finally Initiative 2022,Ecosystem Vulnerable - Either meeting south leg.,240
+Mumbai,MH,India,Tropical,Mumbai_029,58.82,43.3,2024-04-30,BlanchedAlmond Various Initiative 2013,Ecosystem Vulnerable - East picture worry anything.,241
+Hamburg,HH,Germany,Temperate,Hamburg_029,81.98,16.1,2024-01-23,PaleGreen Today Initiative 2018,Ecosystem Vulnerable - Pressure song wide ask cup write away simply.,242
+Berlin,BE,Germany,Temperate,Berlin_023,45.21,27.4,2020-02-23,LightGreen Represent Initiative 2021,Ecosystem Vulnerable - Hope official six.,243
+Berlin,BE,Germany,Temperate,Berlin_024,146.16,27.4,2023-04-05,MediumAquaMarine Cover Initiative 2015,Ecosystem Stable - Should base kid whatever teacher chance.,244
+New York,NY,United States,Temperate,NewYork_029,110.87,12.7,2023-08-03,Chartreuse Late Initiative 2010,Ecosystem Vulnerable - Action list every section.,245
+Berlin,BE,Germany,Temperate,Berlin_025,24.75,6.8,2022-05-03,Turquoise American Initiative 2014,Ecosystem Recovering - Moment can world bring.,246
+Hamburg,HH,Germany,Temperate,Hamburg_030,168.53,18.9,2024-12-13,GhostWhite Effort Initiative 2021,Ecosystem Vulnerable - Again people maintain may tax difference people.,247
+Los Angeles,CA,United States,Temperate,LosAngeles_034,23.43,-6.5,2024-03-24,MediumPurple Reduce Initiative 2010,Ecosystem Stable - Game represent any which.,248
+Munich,BY,Germany,Temperate,Munich_030,53.94,10.8,2022-11-04,SaddleBrown Social Initiative 2022,Ecosystem Vulnerable - Maintain four computer glass gas.,249
+Bangalore,KA,India,Tropical,Bangalore_028,56.58,21.1,2021-03-01,DarkOrange Audience Initiative 2016,Ecosystem Vulnerable - Admit you either finish find wife way.,250
+Munich,BY,Germany,Temperate,Munich_031,67.43,29.8,2024-12-09,DarkRed Morning Initiative 2019,Ecosystem Stable - Situation his customer professor nature.,251
+Bangalore,KA,India,Tropical,Bangalore_029,78.37,17.1,2023-05-17,SlateBlue She Initiative 2020,Ecosystem Recovering - Notice bit design within see space.,252
+Chicago,IL,United States,Temperate,Chicago_025,95.11,27.9,2024-08-04,Blue Compare Initiative 2010,Ecosystem Recovering - Can civil issue final.,253
+New York,NY,United States,Temperate,NewYork_030,177.39,34.3,2020-07-09,DarkOliveGreen During Initiative 2018,Ecosystem Vulnerable - Ago approach five Mrs laugh.,254
+Berlin,BE,Germany,Temperate,Berlin_026,59.71,25.5,2020-07-13,Brown Police Initiative 2011,Ecosystem Stable - Same involve important common rise news.,255
+Los Angeles,CA,United States,Temperate,LosAngeles_035,182.95,24.2,2020-11-26,DarkSalmon Word Initiative 2021,Ecosystem Stable - Image serious while politics statement east seem.,256
+Delhi,DL,India,Tropical,Delhi_023,33.54,32.0,2023-05-17,RosyBrown Detail Initiative 2013,Ecosystem Vulnerable - If drug she special require material spend others.,257
+Hamburg,HH,Germany,Temperate,Hamburg_031,97.96,23.4,2023-03-19,DarkGreen Maybe Initiative 2015,Ecosystem Vulnerable - Late value fire.,258
+Hamburg,HH,Germany,Temperate,Hamburg_032,85.31,18.2,2020-09-09,MidnightBlue Sport Initiative 2019,Ecosystem Vulnerable - Media girl bring subject information tonight but.,259
+Berlin,BE,Germany,Temperate,Berlin_027,103.8,34.7,2023-06-11,Wheat Sometimes Initiative 2022,Ecosystem Vulnerable - Subject address he subject front down.,260
+Los Angeles,CA,United States,Temperate,LosAngeles_036,98.75,16.6,2020-11-16,ForestGreen Issue Initiative 2021,Ecosystem Vulnerable - One small edge artist billion.,261
+Chicago,IL,United States,Temperate,Chicago_026,36.78,11.8,2022-09-11,DarkViolet Operation Initiative 2021,Ecosystem Vulnerable - Cut drive push energy fine candidate.,262
+Delhi,DL,India,Tropical,Delhi_024,52.52,15.2,2024-10-07,Tan Stay Initiative 2020,Ecosystem Recovering - Often bill election between stop girl.,263
+Los Angeles,CA,United States,Temperate,LosAngeles_037,199.61,4.7,2024-08-26,LemonChiffon Share Initiative 2014,Ecosystem Vulnerable - Fight tax family myself quickly despite executive toward.,264
+Bangalore,KA,India,Tropical,Bangalore_030,25.93,16.3,2022-08-06,Lavender Lay Initiative 2020,Ecosystem Vulnerable - Cell eye sing herself edge very.,265
+Los Angeles,CA,United States,Temperate,LosAngeles_038,63.06,4.0,2021-01-11,Peru Task Initiative 2017,Ecosystem Stable - Billion least any model thing performance.,266
+Los Angeles,CA,United States,Temperate,LosAngeles_039,188.71,-6.3,2022-09-24,Tan This Initiative 2023,Ecosystem Stable - Heart pressure medical across firm watch available.,267
+Hamburg,HH,Germany,Temperate,Hamburg_033,63.15,34.7,2024-05-05,Wheat Question Initiative 2010,Ecosystem Vulnerable - Attorney movie around admit program toward push.,268
+Delhi,DL,India,Tropical,Delhi_025,100.14,38.2,2020-09-11,DarkRed Mrs Initiative 2015,Ecosystem Vulnerable - Glass blood see medical.,269
+Hamburg,HH,Germany,Temperate,Hamburg_034,28.76,-8.6,2023-04-19,PaleGoldenRod Despite Initiative 2014,Ecosystem Recovering - West picture offer raise military less amount.,270
+Hamburg,HH,Germany,Temperate,Hamburg_035,131.07,21.8,2023-11-09,Gainsboro Skill Initiative 2015,Ecosystem Vulnerable - Whose act high nor style.,271
+New York,NY,United States,Temperate,NewYork_031,162.74,4.0,2020-03-04,Turquoise Step Initiative 2021,Ecosystem Recovering - Glass information east state.,272
+Mumbai,MH,India,Tropical,Mumbai_030,34.08,44.5,2024-07-16,Orchid Resource Initiative 2023,Ecosystem Recovering - Trade culture kitchen create box do.,273
+Mumbai,MH,India,Tropical,Mumbai_031,82.48,27.0,2023-03-09,FireBrick Claim Initiative 2023,Ecosystem Recovering - Member weight pull follow star single.,274
+Chicago,IL,United States,Temperate,Chicago_027,39.56,25.0,2020-04-18,PowderBlue Three Initiative 2020,Ecosystem Vulnerable - Newspaper each conference marriage risk west research.,275
+Delhi,DL,India,Tropical,Delhi_026,151.67,31.5,2023-07-16,DarkBlue In Initiative 2021,Ecosystem Recovering - Movie water yourself within.,276
+Bangalore,KA,India,Tropical,Bangalore_031,125.51,33.8,2022-07-06,Silver Available Initiative 2015,Ecosystem Stable - Some artist staff community suddenly small word.,277
+Bangalore,KA,India,Tropical,Bangalore_032,126.63,23.2,2022-11-06,MediumSeaGreen Chair Initiative 2015,Ecosystem Recovering - Floor health star.,278
+Hamburg,HH,Germany,Temperate,Hamburg_036,40.03,32.9,2023-06-29,MediumTurquoise Still Initiative 2020,Ecosystem Stable - Bill own change seven before long.,279
+Delhi,DL,India,Tropical,Delhi_027,26.4,18.6,2023-09-03,LightYellow Set Initiative 2019,Ecosystem Stable - Consider argue ago major.,280
+Mumbai,MH,India,Tropical,Mumbai_032,32.92,43.4,2020-06-09,SaddleBrown Ability Initiative 2022,Ecosystem Vulnerable - Food relationship gas trade movie.,281
+Los Angeles,CA,United States,Temperate,LosAngeles_040,103.66,21.7,2023-10-26,Crimson Down Initiative 2015,Ecosystem Recovering - Lawyer result prepare new.,282
+Bangalore,KA,India,Tropical,Bangalore_033,120.03,29.3,2021-02-26,DarkOrange Begin Initiative 2014,Ecosystem Recovering - Character actually a scientist news move.,283
+Bangalore,KA,India,Tropical,Bangalore_034,67.54,29.4,2020-05-08,Gold Religious Initiative 2010,Ecosystem Recovering - Wife base authority attack everybody event.,284
+Hamburg,HH,Germany,Temperate,Hamburg_037,132.69,34.4,2022-12-29,Chartreuse For Initiative 2010,Ecosystem Stable - Recently group contain start impact it.,285
+Bangalore,KA,India,Tropical,Bangalore_035,104.27,18.7,2022-01-04,DarkOrchid Yes Initiative 2016,Ecosystem Vulnerable - Financial answer raise act watch.,286
+Mumbai,MH,India,Tropical,Mumbai_033,39.82,32.0,2024-12-26,LightSteelBlue Same Initiative 2013,Ecosystem Stable - Its our eat his statement hope.,287
+Hamburg,HH,Germany,Temperate,Hamburg_038,178.0,15.3,2020-12-05,LimeGreen Remember Initiative 2011,Ecosystem Stable - Small very opportunity.,288
+Munich,BY,Germany,Temperate,Munich_032,169.06,27.2,2023-08-30,Turquoise Field Initiative 2013,Ecosystem Recovering - Against civil wide his late city democratic.,289
+Hamburg,HH,Germany,Temperate,Hamburg_039,186.0,26.1,2020-08-08,MediumSlateBlue Government Initiative 2014,Ecosystem Stable - Certain question nor benefit role carry building.,290
+Chicago,IL,United States,Temperate,Chicago_028,100.11,22.5,2020-09-16,Snow Increase Initiative 2017,Ecosystem Stable - Tonight gun special like involve.,291
+Los Angeles,CA,United States,Temperate,LosAngeles_041,102.23,-6.9,2022-05-13,SlateBlue Hotel Initiative 2016,Ecosystem Recovering - Onto line color.,292
+New York,NY,United States,Temperate,NewYork_032,55.73,28.9,2022-02-27,DarkOrchid Suffer Initiative 2013,Ecosystem Recovering - Long part though detail.,293
+Munich,BY,Germany,Temperate,Munich_033,137.16,2.7,2023-04-30,SteelBlue Mrs Initiative 2021,Ecosystem Recovering - Increase PM as lead dark movie.,294
+Hamburg,HH,Germany,Temperate,Hamburg_040,38.19,-8.5,2022-11-04,DarkOliveGreen Peace Initiative 2018,Ecosystem Vulnerable - Personal conference government peace modern sing prove.,295
+Berlin,BE,Germany,Temperate,Berlin_028,90.18,32.9,2020-09-24,MediumBlue Rich Initiative 2016,Ecosystem Recovering - Partner theory always pick religious.,296
+Bangalore,KA,India,Tropical,Bangalore_036,100.91,19.6,2022-06-08,Lavender More Initiative 2011,Ecosystem Stable - Question significant return help nation receive they.,297
+Mumbai,MH,India,Tropical,Mumbai_034,105.65,30.1,2023-04-23,LightSalmon Discover Initiative 2021,Ecosystem Stable - Bit door local million together operation.,298
+Los Angeles,CA,United States,Temperate,LosAngeles_042,139.28,20.4,2021-02-26,Bisque Plant Initiative 2020,Ecosystem Vulnerable - Strategy important player certain.,299

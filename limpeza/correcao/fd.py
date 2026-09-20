@@ -92,7 +92,7 @@ def propor_fd(
     return fd
 
 
-def _moda_condicionada(df, mascara, determinante, dependente, valor_det, excluir=None):
+def moda_condicionada(df, mascara, determinante, dependente, valor_det, excluir=None):
     # Duplo filtro: so' linhas com deteccao==0 nas duas colunas entram na moda.
     condicao = (
         (df[determinante] == valor_det)
@@ -128,7 +128,7 @@ def validar_fd(fd: DependenciaFuncional, rotulados: list[dict], df, mascara, dep
         idx = r["indice"]
         valor_det = df.at[idx, determinante]
         excluir = idx if not r["eh_erro"] else None
-        corrigido = _moda_condicionada(
+        corrigido = moda_condicionada(
             df, mascara, determinante, dependente, valor_det, excluir=excluir
         )
         if corrigido is None:
@@ -148,7 +148,7 @@ def aplicar_fd(fd: DependenciaFuncional, df, indices_marcados, mascara, dependen
     mudancas = {}
     for idx in indices_marcados:
         valor_det = df.at[idx, determinante]
-        corrigido = _moda_condicionada(df, mascara, determinante, dependente, valor_det)
+        corrigido = moda_condicionada(df, mascara, determinante, dependente, valor_det)
         if corrigido is None:
             continue  # sem pool: deixa escalar
         atual = df.at[idx, dependente]
