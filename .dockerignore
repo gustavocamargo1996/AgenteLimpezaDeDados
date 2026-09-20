@@ -1,0 +1,10 @@
+.venv/
+.git/
+runs/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.env
+docs/
+.superpowers/

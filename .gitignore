@@ -11,3 +11,6 @@ venv/
 
 # notas internas de sessao (nao publicar)
 .claude/
+
+# modelo de embeddings copiado para o contexto de build (ver Dockerfile)
+all-MiniLM-L6-v2/
