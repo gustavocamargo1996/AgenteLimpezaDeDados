@@ -179,6 +179,11 @@ quatro papéis de uma vez.
 
 ## Em container / Portainer
 
+> **Nunca usou Portainer?** [`docs/GUIA_PORTAINER.md`](docs/GUIA_PORTAINER.md)
+> é o passo a passo completo, do primeiro clique ao download do resultado,
+> sem pressupor conhecimento de Docker. Esta seção aqui é a referência
+> técnica; o guia é a receita.
+
 A imagem traz a POC e o MiniLM dentro (732 MB de conteúdo, 255 MB
 comprimido); os CSVs **não** entram nela — entram por volume, para que dado
 sensível não fique preso num artefato que se copia por engano.
