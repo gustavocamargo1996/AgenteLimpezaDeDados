@@ -19,6 +19,19 @@ MODELO_LLM = os.getenv("MODELO_LLM", "gpt-4o-mini")
 TEMPERATURA = 0.0
 TIMEOUT_LLM = 180
 
+PROVEDOR = os.getenv("PROVEDOR", "openai")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+# Sobrepoe MODELO_LLM num papel so'; vazio significa "usa o geral".
+MODELOS_POR_PAPEL = {
+    papel: os.getenv(f"MODELO_{papel.upper()}")
+    for papel in ("deteccao", "especificador", "codigo", "fd")
+}
+MODELOS_POR_PAPEL = {p: m for p, m in MODELOS_POR_PAPEL.items() if m}
+
+# Ollama local em CPU ja levou 808s numa chamada; 180 derrubaria o run.
+TIMEOUT_POR_PROVEDOR = {"openai": 180, "ollama": 900}
+
 # Ver docs/DECISOES.md#kmeans-sobre-distintos.
 N_CLUSTERS = 6
 MAX_REPRESENTANTES = 12

@@ -5,6 +5,7 @@ onnxruntime>=1.18
 tokenizers>=0.20
 langchain-core>=0.3
 langchain-openai>=0.2
+langchain-ollama>=1.1
 pydantic>=2.7
 python-dotenv>=1.0
 pytest>=8.0
