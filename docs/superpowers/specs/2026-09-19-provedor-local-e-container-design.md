@@ -137,11 +137,25 @@ Ollama), sobreponível por `TIMEOUT_LLM`.
 — não cai em silêncio para OpenAI, que mandaria dado para fora da rede.
 Falhar alto é a única opção segura sob esta restrição.
 
-### Ponto a verificar, não a assumir
+### Os dois clientes não têm a mesma interface — verificado
 
-`ChatOpenAI` recebe `max_retries=2`. Se `ChatOllama` aceita o mesmo parâmetro
-precisa ser **verificado na implementação instalada**, não presumido. Se não
-aceitar, a fábrica omite o parâmetro no ramo Ollama.
+Inspecionei `langchain-ollama 1.1.0`. `ChatOllama` **não aceita `max_retries`
+nem `timeout`**; aceita `model`, `base_url`, `temperature`, `num_predict`,
+`format`, `keep_alive` e `client_kwargs`.
+
+O `client_kwargs` é mesclado e repassado a `ollama.Client(host=..., **kwargs)`,
+que o entrega ao httpx. Então os dois ramos da fábrica divergem assim:
+
+| | OpenAI | Ollama |
+|---|---|---|
+| timeout | `timeout=180` | `client_kwargs={"timeout": 900}` |
+| retry | `max_retries=2` | **não existe** — o parâmetro é omitido |
+
+A ausência de retry no ramo Ollama não é lacuna a preencher agora: o pipeline
+já degrada por conta própria quando uma chamada falha (seção 6 do
+`CLAUDE.md`), e a sondagem confirmou que essa degradação funciona. Se
+acrescentar retry vale a pena depende do modelo escolhido no servidor —
+decidir com dado, não agora.
 
 ## 4. `escolher_modelo.py` — a sondagem vira ferramenta
 
@@ -321,7 +335,7 @@ Testes novos, todos sem rede:
 | Nenhum modelo local gera detecção que passe no portão | `escolher_modelo.py` mede isso em minutos, antes de qualquer run caro. Se nenhum passar, a decisão volta para o usuário com dado na mão. |
 | O seletor altera o caminho OpenAI sem querer | Os 89 testes e o invariante rodam a cada fase (seção 7) |
 | `PROVEDOR` errado manda dado para fora da rede | Valor desconhecido falha alto na construção, nunca cai para OpenAI em silêncio |
-| `ChatOllama` não aceitar `max_retries` | Verificar na implementação instalada; omitir o parâmetro no ramo Ollama se não aceitar |
+| Sem retry no ramo Ollama (o cliente não tem o parâmetro) | Verificado, não presumido. O pipeline já degrada sozinho quando uma chamada falha; acrescentar retry depende do modelo escolhido |
 | Timeout curto derruba run local que ia completar | Default por provedor: 900 s no Ollama, medido contra os 808 s da sondagem |
 | Repositório privado impede o build por Git | Verificar credencial no Portainer; alternativa é registry |
 | Portainer sem navegação de volumes | O serviço `arquivos` cobre; verificar antes para não subir serviço desnecessário |
