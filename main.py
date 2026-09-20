@@ -1,5 +1,6 @@
 """CLI da POC: le os argumentos, chama a espinha do pipeline e imprime o resultado."""
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -15,8 +16,10 @@ from limpeza import config, dados, pipeline  # noqa: E402
 def _argumentos(argv=None):
     ap = argparse.ArgumentParser(
         description="POC: geracao de limpador autonomo a partir do dirty e do clean")
-    ap.add_argument("--sujo", required=True, help="CSV com os dados sujos")
-    ap.add_argument("--limpo", required=True, help="CSV de referencia (orcamento de rotulos)")
+    ap.add_argument("--sujo", default=os.getenv("SUJO"),
+                    help="CSV com os dados sujos (ou a variavel SUJO)")
+    ap.add_argument("--limpo", default=os.getenv("LIMPO"),
+                    help="CSV de referencia (ou a variavel LIMPO)")
     ap.add_argument("--colunas", default="todas",
                     help="lista separada por virgula, ou 'todas'")
     ap.add_argument("--modelo", default=config.MODELO_LLM)
@@ -29,7 +32,12 @@ def _argumentos(argv=None):
                     dest="amostras_iter",
                     help="valores distintos que o oraculo rotula por iteracao "
                          "(metade previsto-sujo, metade previsto-limpo)")
-    return ap.parse_args(argv)
+    args = ap.parse_args(argv)
+    faltando = [n for n in ("sujo", "limpo") if not getattr(args, n)]
+    if faltando:
+        ap.error(f"faltam --{' e --'.join(faltando)} (ou as variaveis "
+                 f"{' e '.join(n.upper() for n in faltando)})")
+    return args
 
 
 def _aplicar_config(args) -> None:

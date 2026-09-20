@@ -14,6 +14,8 @@ from limpeza.correcao import cascata, fd as fd_mod
 from limpeza.esquemas import RegraDeteccao
 from limpeza.tipos import Amostra, Coluna, Trabalho
 
+import main as cli
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 DETECTA_OZ = "def detectar(col):\n    return col.str.endswith('oz')\n"
@@ -244,3 +246,28 @@ def test_caminho_sujo_inexistente_levanta_dados_invalidos():
 
     with pytest.raises(dados.DadosInvalidos, match="nao encontrado"):
         dados.carregar(FIXTURES / "nao_existe.csv", FIXTURES / "beers_clean_300.csv")
+
+
+def test_sujo_e_limpo_saem_do_ambiente(monkeypatch):
+    """As variaveis SUJO e LIMPO suprem os argumentos --sujo e --limpo."""
+    monkeypatch.setenv("SUJO", "/dados/a_dirty.csv")
+    monkeypatch.setenv("LIMPO", "/dados/a_clean.csv")
+    args = cli._argumentos([])
+    assert args.sujo == "/dados/a_dirty.csv"
+    assert args.limpo == "/dados/a_clean.csv"
+
+
+def test_argumento_vence_a_variavel(monkeypatch):
+    """Argumento explícito supera a variável de ambiente."""
+    monkeypatch.setenv("SUJO", "/dados/do_ambiente.csv")
+    args = cli._argumentos(["--sujo", "/dados/do_argumento.csv",
+                            "--limpo", "/dados/b.csv"])
+    assert args.sujo == "/dados/do_argumento.csv"
+
+
+def test_sem_argumento_e_sem_variavel_e_erro(monkeypatch):
+    """Falta de argumento e variável gera erro com saída."""
+    monkeypatch.delenv("SUJO", raising=False)
+    monkeypatch.delenv("LIMPO", raising=False)
+    with pytest.raises(SystemExit):
+        cli._argumentos([])
