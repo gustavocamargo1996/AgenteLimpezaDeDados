@@ -59,5 +59,6 @@ class Trabalho:
     coluna: Coluna
     amostra: Amostra | None
     detector: Detector | None
+    dependencia: Any = None  # DependenciaFuncional aprovada na deteccao, ou None
     correcao: Correcao | None = None
     medida: dict | None = None

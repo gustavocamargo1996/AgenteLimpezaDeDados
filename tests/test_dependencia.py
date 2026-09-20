@@ -3,6 +3,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from limpeza.deteccao import dependencia
+from limpeza.esquemas import DependenciaFuncional
+from limpeza.tipos import Amostra, Coluna, Tabela, Trabalho
+
 FIXTURES = Path(__file__).parent / "fixtures"
 LER = dict(dtype=str, keep_default_na=False, na_values=[])
 
@@ -28,3 +32,129 @@ def test_fixture_nenhum_erro_e_alcancavel_intra_coluna():
         ambiguo = pd.DataFrame({"v": sujo[col], "e": err}).groupby("v")["e"].transform(
             lambda s: s.any() and (~s).any())
         assert int((err & ~ambiguo).sum()) == 0, f"{col} tem erro alcancavel intra-coluna"
+
+
+class _AgenteFalso:
+    """Devolve sempre a mesma FD; nenhuma chamada sai da maquina."""
+
+    def __init__(self, resposta):
+        self._resposta = resposta
+
+    def invoke(self, _args):
+        return self(_args)
+
+    # __call__ (alem de invoke) deixa `prompt | agente` coercer este duble
+    # num Runnable, sem precisar de RunnableLambda explicito no teste.
+    def __call__(self, _args):
+        if isinstance(self._resposta, Exception):
+            raise self._resposta
+        return self._resposta
+
+
+def _tabela_environment(colunas):
+    sujo, limpo = _environment()
+    cols = []
+    for nome in colunas:
+        cols.append(Coluna(nome=nome, sujo=sujo[nome], limpo=limpo[nome],
+                           valores_distintos=sorted(sujo[nome].unique()),
+                           contagem=sujo[nome].value_counts().to_dict()))
+    return Tabela(sujo=sujo, limpo=limpo, nome="environment", colunas=cols)
+
+
+def _trabalhos(tabela, linhas=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)):
+    """Um Trabalho por coluna, com orcamento rotulado nas primeiras linhas."""
+    saida = []
+    for col in tabela.colunas:
+        rot = [{"indice": i, "sujo": col.sujo.at[i], "limpo": col.limpo.at[i],
+                "eh_erro": col.sujo.at[i] != col.limpo.at[i]} for i in linhas]
+        saida.append(Trabalho(
+            coluna=col,
+            amostra=Amostra(representantes=[], linhas=set(linhas), rotulados=rot,
+                            total_linhas=len(col.sujo), total_distintos=0),
+            detector=None))
+    return saida
+
+
+def _mascara_zerada(tabela):
+    return pd.DataFrame(0, index=tabela.sujo.index, columns=tabela.sujo.columns, dtype=int)
+
+
+def test_marca_os_54_erros_de_state():
+    tabela = _tabela_environment(["State"])
+    trabalhos = _trabalhos(tabela)
+    agente = _AgenteFalso(DependenciaFuncional(
+        determinante="City", dependente="State", justificativa="cidade fixa o estado"))
+    m = dependencia.detectar_dependencia(trabalhos, tabela, _mascara_zerada(tabela), agente)
+    assert int(m["State"].sum()) == 54
+    err = tabela.sujo["State"] != tabela.limpo["State"]
+    assert int((m["State"].astype(bool) & ~err).sum()) == 0, "marcou celula correta"
+
+
+def test_marca_os_26_erros_de_climate_zone():
+    tabela = _tabela_environment(["Climate_Zone"])
+    agente = _AgenteFalso(DependenciaFuncional(
+        determinante="City", dependente="Climate_Zone", justificativa="cidade fixa o clima"))
+    m = dependencia.detectar_dependencia(_trabalhos(tabela), tabela,
+                                         _mascara_zerada(tabela), agente)
+    assert int(m["Climate_Zone"].sum()) == 26
+
+
+def test_fd_reprovada_no_gate_nao_marca_nada():
+    """Determinante que nao explica a coluna: o gate barra antes de marcar."""
+    tabela = _tabela_environment(["State"])
+    agente = _AgenteFalso(DependenciaFuncional(
+        determinante="PM2.5", dependente="State", justificativa="ruim de proposito"))
+    m = dependencia.detectar_dependencia(_trabalhos(tabela), tabela,
+                                         _mascara_zerada(tabela), agente)
+    assert int(m["State"].sum()) == 0
+
+
+def test_fd_reprovada_nao_e_guardada_no_trabalho():
+    """Guardar uma FD reprovada faria a cascata contornar o gate."""
+    tabela = _tabela_environment(["State"])
+    trabalhos = _trabalhos(tabela)
+    agente = _AgenteFalso(DependenciaFuncional(
+        determinante="PM2.5", dependente="State", justificativa="ruim de proposito"))
+    dependencia.detectar_dependencia(trabalhos, tabela, _mascara_zerada(tabela), agente)
+    assert getattr(trabalhos[0], "dependencia", None) is None
+
+
+def test_fd_aprovada_e_guardada_no_trabalho():
+    tabela = _tabela_environment(["State"])
+    trabalhos = _trabalhos(tabela)
+    agente = _AgenteFalso(DependenciaFuncional(
+        determinante="City", dependente="State", justificativa="cidade fixa o estado"))
+    dependencia.detectar_dependencia(trabalhos, tabela, _mascara_zerada(tabela), agente)
+    assert trabalhos[0].dependencia.determinante == "City"
+
+
+def test_grupo_sem_moda_nao_marca_ninguem():
+    """Duplo filtro esvaziou o grupo: sem referencia, nao ha o que acusar."""
+    tabela = _tabela_environment(["State"])
+    mascara = _mascara_zerada(tabela)
+    mascara["City"] = 1  # nenhuma linha passa no duplo filtro
+    mascara["State"] = 1
+    m = dependencia._desvios_da_moda(tabela.sujo, mascara, "City", "State")
+    assert int(m.sum()) == 0, "marcou sem ter moda para comparar"
+
+
+def test_excecao_numa_coluna_nao_derruba_as_outras():
+    tabela = _tabela_environment(["State", "Climate_Zone"])
+    trabalhos = _trabalhos(tabela)
+    chamadas = {"n": 0}
+
+    class _AgenteQueFalhaUmaVez:
+        def invoke(self, _args):
+            return self(_args)
+
+        def __call__(self, _args):
+            chamadas["n"] += 1
+            if chamadas["n"] == 1:
+                raise RuntimeError("boom")
+            return DependenciaFuncional(determinante="City", dependente="Climate_Zone",
+                                        justificativa="cidade fixa o clima")
+
+    m = dependencia.detectar_dependencia(trabalhos, tabela, _mascara_zerada(tabela),
+                                         _AgenteQueFalhaUmaVez())
+    assert int(m["State"].sum()) == 0, "a coluna que falhou nao marca"
+    assert int(m["Climate_Zone"].sum()) == 26, "a seguinte segue normalmente"
