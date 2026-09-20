@@ -259,7 +259,7 @@ aparecer. A máscara é consumida como `DataFrame[bool]` pelas etapas de
 correção, métrica e empacotamento, que não sabem como ela foi construída.
 
 **Onde:** ver tabela acima; a mesma lista está reproduzida em `CLAUDE.md`,
-seção 7, e a original em
+seção 8, e a original em
 `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`, seção 9.
 
 <a id="escalonamento-celula-a-celula"></a>

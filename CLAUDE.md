@@ -79,6 +79,23 @@ Testes (nenhum gasta API — usam dublês de LLM e o limpador congelado):
 .venv/Scripts/python -m pytest tests/ -v
 ```
 
+### Em container
+
+A imagem traz o MiniLM assado dentro e entra num stack com o Ollama; nada sai
+da rede. O build precisa dos dois arquivos do modelo no contexto
+(`all-MiniLM-L6-v2/onnx/model_O4.onnx` e `all-MiniLM-L6-v2/tokenizer.json`) —
+a pasta está no `.gitignore`, então quem builda copia antes. O README tem o
+comando e o ciclo de trabalho no Portainer; aqui fica só o essencial:
+
+```bash
+docker build -t limpeza-poc .
+docker run --rm limpeza-poc --help
+docker compose up -d ollama arquivos
+```
+
+O serviço `poc` do `docker-compose.yml` é um **job one-shot** (`restart: "no"`):
+sobe, roda `main.py` uma vez com `SUJO`/`LIMPO`/`SAIDA` do ambiente, e para.
+
 ---
 
 ## 3. A arquitetura
@@ -86,12 +103,14 @@ Testes (nenhum gasta API — usam dublês de LLM e o limpador congelado):
 ```
 main.py                     CLI: lê argumentos, chama a espinha, imprime
 avaliar_limpador.py         CLI: F1 de reparo de um limpador já gerado (sem API)
+escolher_modelo.py          CLI: mede se um modelo serve, antes de gastar um run
 
 limpeza/
   pipeline.py               A ESPINHA — as etapas em ordem. Comece a ler aqui.
   tipos.py                  Coluna, Tabela, Amostra, Detector, Correcao, Trabalho
   config.py                 tudo que é ajustável (modelo, clusters, iterações)
   esquemas.py               contratos pydantic entre os agentes LLM
+  llm.py                    o único lugar que sabe que há mais de um provedor
 
   dados.py                  etapa 1 — carga literal dos dois CSVs → Tabela
   amostragem.py             etapa 2 — MiniLM ONNX + KMeans → representantes + rótulos
@@ -108,6 +127,9 @@ limpeza/
   empacotar.py              etapa 5 — escreve o limpador_<nome>.py autônomo
   metricas.py               etapa 6 — P/R/F1 de detecção, acerto/dano de correção
   relatorio.py              artefatos por execução (cadeias_deteccao.md, cascata.md, ...)
+
+Dockerfile                  imagem da POC, com os dois arquivos do MiniLM dentro
+docker-compose.yml          stack: ollama + arquivos + a POC como job one-shot
 ```
 
 A numeração é a das chamadas em `gerar_limpador`, logo abaixo, e os docstrings
@@ -145,7 +167,7 @@ def gerar_limpador(caminho_sujo, caminho_limpo, colunas=None,
 ```
 
 `_processar_coluna` (amostrar → detectar → refinar) é a única fronteira de
-resiliência do run: ver a seção 6.
+resiliência do run: ver a seção 7.
 
 ---
 
@@ -165,11 +187,102 @@ Tudo que viaja entre as etapas está em `limpeza/tipos.py`, e nada mais viaja.
 **`Detector` guarda `codigo` e `funcao` sem inspecionar a assinatura, de
 propósito.** Ele não sabe — e não pode passar a saber — que a função se chama
 `detectar` nem que ela recebe uma coluna. Essa ignorância é o que permite
-trocar o contrato de detecção sem tocar no tipo. Ver a seção 7.
+trocar o contrato de detecção sem tocar no tipo. Ver a seção 8.
 
 ---
 
-## 5. Invariante de aceitação
+## 5. Provedores de LLM
+
+`limpeza/llm.py` é o **único** lugar do repositório que sabe que existe mais de
+um provedor. Os quatro construtores de agente — `deteccao/regra.py`,
+`correcao/regras.py` (duas vezes: especificador e tradutor de código) e
+`correcao/fd.py` — chamam `llm.construir(schema, papel, modelo=modelo)` e não
+importam cliente nenhum. O teste que vale é este:
+
+```bash
+git grep -n "ChatOpenAI\|ChatOllama" -- "limpeza/"
+```
+
+Se ele responder qualquer coisa além de `limpeza/llm.py`, o seletor virou dois
+lugares. **Não acrescente um segundo.**
+
+A superfície do módulo é pequena de propósito:
+
+| Função | O que faz |
+|---|---|
+| `construir(schema, papel, modelo=None)` | o que os agentes chamam: devolve o cliente já amarrado ao schema pydantic |
+| `cliente(provedor, modelo, segundos)` | o `if` do provedor, cru, sem schema |
+| `modelo_do_papel(papel)` | `MODELO_<PAPEL>` se existir, senão `MODELO_LLM` |
+| `timeout_do_provedor(provedor)` | `TIMEOUT_LLM` se existir, senão o default do provedor |
+| `ProvedorDesconhecido(ValueError)` | o que `cliente` levanta num `PROVEDOR` que não conhece |
+
+Os papéis são quatro, e o nome é a chave de tudo: `deteccao`,
+`especificador`, `codigo`, `fd`.
+
+### Precedência de modelo
+
+Explícito → papel → geral:
+
+1. o argumento `modelo=` de `construir` (só `escolher_modelo.py` usa hoje);
+2. `MODELO_DETECCAO`, `MODELO_ESPECIFICADOR`, `MODELO_CODIGO`, `MODELO_FD` —
+   a sobreposição por papel, montada em `config.MODELOS_POR_PAPEL`. Vazio não
+   conta como valor: cai para o geral;
+3. `MODELO_LLM` — o geral, que `main.py --modelo` também escreve.
+
+### Timeout, e o que o `ChatOllama` não tem
+
+O default é **180s no `openai` e 900s no `ollama`**
+(`config.TIMEOUT_POR_PROVEDOR`); `TIMEOUT_LLM` sobrepõe os dois. Os 900s não
+são folga decorativa: uma chamada em CPU já levou 808s nesta POC.
+
+**`ChatOllama` 1.1 não aceita `timeout` nem `max_retries` no construtor** —
+verificado por inspeção da assinatura, não suposto. O timeout desce por
+`client_kwargs={"timeout": segundos}`, que o `httpx` recebe. Retry **não
+existe** no ramo Ollama (o ramo OpenAI tem `max_retries=2`), e não precisa
+existir: quando uma chamada falha, quem degrada é
+`pipeline.py::_processar_coluna` — a coluna fica com a regra de 1-passe, ou
+sem regra, e o run continua.
+
+### `PROVEDOR` desconhecido falha alto
+
+`cliente` levanta `ProvedorDesconhecido` em vez de cair para `openai`. Isso
+**não** é rigor estético: é a restrição de privacidade do projeto. Um typo em
+`PROVEDOR` que caísse silenciosamente para o padrão mandaria a tabela do
+usuário para fora da rede — exatamente o que o provedor local existe para
+impedir. Falhar no primeiro agente, com o valor errado na mensagem, é o
+comportamento correto.
+
+### `escolher_modelo.py`: o modelo serve?
+
+Mede se um modelo consegue preencher os quatro schemas **antes** de gastar um
+run inteiro. Usa os prompts reais e amostras fixas do `beers`, três repetições
+por papel:
+
+```bash
+.venv/Scripts/python escolher_modelo.py --modelo qwen2.5-coder:14b
+```
+
+O provedor é o do `.env` (`PROVEDOR=ollama` para medir um modelo local), e
+`--modelo` passa por cima de `MODELO_LLM` e das sobreposições por papel nos
+quatro de uma vez. `--repeticoes` muda o denominador, que é 3 por padrão.
+
+Sai uma linha por papel com dois números: quantas vezes o schema foi
+preenchido e, nos dois papéis que geram código, quantas vezes o portão AST
+aceitou o resultado.
+
+**O critério de aprovação é a linha da detecção.** Um modelo que preenche o
+schema mas cujo `detectar(col)` o portão rejeita produz **limpador vazio** —
+por melhor que seja nos outros três papéis. A cadeia é mecânica: sem regra
+aceita, `_processar_coluna` cai para `detector_nulo` (`DETECTA_NADA`, que é
+`col.isin([])`); um detector que não marca nada dá máscara toda zero; máscara
+zero não dá nenhuma célula para a cascata corrigir; e o limpador empacotado
+sai com esse detector e plano de correção vazio. É por isso que `_imprimir`
+decide o veredito olhando só `placar["deteccao"]["portao_ok"]`: os outros três
+papéis não salvam um run cuja detecção não passou no portão.
+
+---
+
+## 6. Invariante de aceitação
 
 `tests/test_invariante.py` aplica o limpador **congelado** de
 `tests/fixtures/limpador_beers_congelado.py` às 300 linhas de
@@ -207,7 +320,7 @@ run.
 
 ---
 
-## 6. Políticas
+## 7. Políticas
 
 ### Comentários
 
@@ -217,12 +330,12 @@ run.
 - **Não** comentar: histórico ("antes isso era..."), medição ("reduz 40% do
   tempo"), comparação com o ZeroDC, plano de IA ("aqui poderíamos...").
   Comentário descreve a mecânica do que está ali, ou não existe.
-- Densidade atual: **11,1%** em 2.497 linhas. `tests/medir_verbosidade.py`
+- Densidade atual: **12,2%** em 2.540 linhas. `tests/medir_verbosidade.py`
   mede; use antes de commitar uma tarefa que mexe em muitos arquivos.
 
 ### Exceções
 
-São **16**, sendo 13 no código do pipeline e 3 dentro da string `_ESTATICO` de
+São **18**, sendo 15 no código do repositório e 3 dentro da string `_ESTATICO` de
 `empacotar.py` — estes últimos rodam no limpador gerado, não aqui. A regra é:
 exceção existe onde a falha tem um comportamento de degradação **nomeado**,
 nunca como rede genérica. Cite função, não número de linha: linha muda, função
@@ -240,10 +353,11 @@ não.
 | `sandbox.py::validar`, `sandbox.py::testar_fumaca` (3) | o portão *é* o lugar onde código gerado falha |
 | `empacotar.py::_ESTATICO` (3) | o limpador gerado roda **sem** sandbox na máquina do usuário; regra que explode numa célula deixa a célula intacta |
 | `main.py::main` | `DadosInvalidos` é erro do usuário: mensagem curta, sem traceback |
+| `escolher_modelo.py::medir` (2) | é a ferramenta de medir um modelo: chamada que falha conta como schema não preenchido, código rejeitado conta como portão não passado. Aqui a falha **é** o dado. |
 
 ### Loops
 
-São **40** (incluindo `avaliar_limpador.py`). Colapse loops **paralelos** —
+São **44** (incluindo `avaliar_limpador.py` e `escolher_modelo.py`). Colapse loops **paralelos** —
 dois `for` sobre a mesma sequência viram um. Mantenha os que **carregam
 estado** entre iterações: o escalonamento célula a célula da cascata
 (`pendentes`/`restantes`) e o loop de refino são estado acumulado, e fundi-los
@@ -251,14 +365,14 @@ com outra coisa esconde a mecânica que eles implementam.
 
 ---
 
-## 7. A costura cross-column (o próximo projeto)
+## 8. A costura cross-column (o próximo projeto)
 
 A detecção hoje é **intra-coluna**: o contrato é
 `detectar(col) -> pd.Series[bool]` — recebe só a própria coluna e devolve um
 booleano por linha, sem olhar as outras colunas. O **próximo projeto do
 usuário** é trocar esse contrato por uma forma cross-column.
 
-Essa restrição está concentrada em **10 pontos, 7 arquivos**. Ela está
+Essa restrição está concentrada em **11 pontos, 8 arquivos**. Ela está
 concentrada de propósito: se uma tarefa espalhar esse conhecimento, o próximo
 projeto passa a ter que redescobrir o contrato em vez de trocá-lo num lugar
 só.
@@ -275,9 +389,14 @@ só.
 | 8 | `limpeza/deteccao/mascara.py` | aplica `detectar(col)` uma vez por coluna, posicional | não |
 | 9 | `limpeza/esquemas.py::RegraDeteccao` | docstring da classe e `description` do campo `codigo` repetem o contrato | não |
 | 10 | `limpeza/empacotar.py` | cópia congelada da mesma aplicação, no limpador gerado | não |
+| 11 | `escolher_modelo.py::CASOS` | o caso `deteccao` repete `nome_funcao="detectar"`, `nome_argumento="col"`, `series_mode=True` para chamar o portão | não — chegou com a ferramenta de escolha de modelo |
 
-**Regra para qualquer tarefa daqui em diante:** esses 10 pontos continuam
-sendo os *únicos* lugares que sabem que a detecção é intra-coluna. Em
+**Regra para qualquer tarefa daqui em diante:** esses 11 pontos continuam
+sendo os *únicos* lugares que sabem que a detecção é intra-coluna. O 11º não
+estava na lista original: ele entrou com `escolher_modelo.py` (projeto
+provedor-local, set/2026), e está registrado aqui em vez de escondido — quem
+trocar o contrato tem de trocá-lo também, ou a ferramenta passa a medir um
+contrato que não existe mais. Em
 particular, `Detector` guarda `codigo`/`funcao` sem interpretar a assinatura
 (seção 4). A máscara, porém, **não** é `DataFrame[bool]` dentro da POC: ela
 nasce `dtype=int` em `deteccao/mascara.py`, e `correcao/cascata.py` e
@@ -285,12 +404,12 @@ nasce `dtype=int` em `deteccao/mascara.py`, e `correcao/cascata.py` e
 (`empacotar.py::_mascara`) reconstrói a sua própria versão `bool`. Não
 acrescente um décimo primeiro ponto.
 
-Lista original: `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`,
+Lista original (10 pontos): `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`,
 seção 9. Racional: `docs/DECISOES.md#deteccao-intra-coluna`.
 
 ---
 
-## 8. Onde não mexer sem ler antes
+## 9. Onde não mexer sem ler antes
 
 **`limpeza/sandbox.py`** — é o portão de segurança. Todo código Python escrito
 por LLM passa por ele antes de ser executado: allowlist de builtins, proibição
@@ -316,7 +435,7 @@ antes de dizer que está coberto.
 
 ---
 
-## 9. Idioma
+## 10. Idioma
 
 **Português do Brasil em tudo:** nomes de função e variável, docstrings,
 comentários, mensagens de log, documentos, mensagens de commit — e as

@@ -9,8 +9,68 @@ função, não commit.
 
 ## [Não publicado]
 
-Simplificação do gerador de limpadores (30/ago/2026). O objetivo declarado era
-reduzir a superfície do código sem mover um único número publicado — e o
+Duas frentes desde o último marco: **provedor local e container**
+(19/set/2026) e a **simplificação do gerador** (30/ago/2026). O invariante de
+`tests/test_invariante.py` (495 erros, 121 mudanças, 121 TP, precisão 1,0,
+recall 0,2444, F1 0,3929, 71 flags no `beers` de 300 linhas) é o mesmo nas
+duas: nenhuma delas moveu um número publicado.
+
+### Adicionado — provedor local e container (19/set/2026)
+
+- **Seletor de provedor: OpenAI ou Ollama, num repositório só.**
+  `limpeza/llm.py` é o **único** lugar que sabe que existe mais de um
+  provedor; os quatro construtores de agente (`deteccao/regra.py`,
+  `correcao/regras.py` duas vezes, `correcao/fd.py`) viraram uma chamada a
+  `llm.construir(schema, papel)` cada. A escolha sai do `.env`: `PROVEDOR`,
+  `OLLAMA_URL`, `MODELO_DETECCAO`/`_ESPECIFICADOR`/`_CODIGO`/`_FD` e
+  `TIMEOUT_LLM`. Precedência de modelo: explícito → papel → `MODELO_LLM`.
+- **`PROVEDOR` desconhecido falha alto**, com `ProvedorDesconhecido`. Não cai
+  para `openai` em silêncio: um typo que caísse mandaria a tabela do usuário
+  para fora da rede, que é exatamente o que o provedor local existe para
+  impedir.
+- **Timeout por provedor**: 180s no `openai`, 900s no `ollama` — uma chamada
+  em CPU já levou 808s nesta POC. `ChatOllama` 1.1 **não aceita** `timeout`
+  nem `max_retries` no construtor (verificado por inspeção), então o timeout
+  desce por `client_kwargs={"timeout": N}` e o ramo local **não tem retry**;
+  quem degrada quando uma chamada falha é `pipeline.py::_processar_coluna`, a
+  fronteira de resiliência que já existia.
+- **`escolher_modelo.py`** — mede se um modelo serve **antes** de gastar um
+  run inteiro: invoca os quatro papéis com os prompts reais e amostras fixas
+  do `beers`, e conta duas coisas por papel, schema preenchido e código aceito
+  pelo portão AST. O veredito olha só a linha da detecção: um modelo que não
+  gera `detectar(col)` aceito pelo portão produz limpador vazio, por melhor
+  que seja nos outros três papéis.
+- **A sondagem que autorizou este trabalho** foi exatamente esse teste, com
+  `qwen2.5:3b`, três repetições por agente e os prompts reais: a **detecção**
+  preencheu o schema 3/3 mas teve o código **rejeitado pelo portão AST 3/3**,
+  sempre por conter mais de uma definição; o **tradutor de código** foi 3/3 no
+  schema e 3/3 no portão; a **dependência funcional**, 3/3; o
+  **especificador**, 2/3. Ou seja: o gargalo de um modelo pequeno é
+  justamente o papel que decide se sai limpador.
+- **Imagem da POC** (`Dockerfile` + `.dockerignore`), com os dois arquivos do
+  MiniLM assados dentro e `MODELO_EMBEDDING=/modelo`: **732 MB de conteúdo,
+  255 MB comprimido** (`docker images` relata 1,03 GB, que é métrica de disco
+  não deduplicada do snapshotter containerd, não o tamanho transportável). A
+  camada do `pip install` responde por 591 MB e o MiniLM por 45,2 MB. Os CSVs
+  não entram na imagem: entram por volume. Smoke do `Embedder` dentro do
+  container: `similar` 0,5428 contra `distante` 0,1821.
+- **Stack do Portainer** (`docker-compose.yml`): `ollama` (modelos no volume
+  `ollama-modelos`, que sobrevive a redeploy), `arquivos` (filebrowser em
+  `:8080`, para subir CSV e baixar artefato) e `poc` como **job one-shot**
+  (`restart: "no"`). `SUJO`, `LIMPO` e `SAIDA` viraram o default de
+  `--sujo`/`--limpo`/`--saida` — na UI do Portainer editar variável é fácil e
+  editar comando é desconfortável, e pela linha de comando nada mudou.
+- **Suíte de 87 para 106 testes**, todos sem API. Densidade de comentário:
+  12,2% em 2.540 linhas.
+- **Documentação**: seção nova no `CLAUDE.md` (provedores, precedência,
+  timeout, o critério de escolha de modelo), seções "Rodando com modelo local"
+  e "Em container / Portainer" no `README.md` — inclusive o passo de copiar os
+  dois arquivos do MiniLM para o contexto de build, que o `.gitignore` não
+  versiona — e as variáveis novas no `.env.example`.
+
+**Simplificação do gerador de limpadores (30/ago/2026)** — as duas seções
+abaixo, `Removido` e `Alterado`, são dela. O objetivo declarado era reduzir a
+superfície do código sem mover um único número publicado — e o
 invariante de `tests/test_invariante.py` (495 erros, 121 mudanças, 121 TP,
 precisão 1,0, recall 0,2444, F1 0,3929, 71 flags no `beers` de 300 linhas)
 continua idêntico ao do início.
