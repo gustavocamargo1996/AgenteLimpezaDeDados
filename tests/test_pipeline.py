@@ -258,7 +258,7 @@ def test_sujo_e_limpo_saem_do_ambiente(monkeypatch):
 
 
 def test_argumento_vence_a_variavel(monkeypatch):
-    """Argumento explícito supera a variável de ambiente."""
+    """Argumento explicito supera a variavel de ambiente."""
     monkeypatch.setenv("SUJO", "/dados/do_ambiente.csv")
     args = cli._argumentos(["--sujo", "/dados/do_argumento.csv",
                             "--limpo", "/dados/b.csv"])
@@ -266,7 +266,7 @@ def test_argumento_vence_a_variavel(monkeypatch):
 
 
 def test_sem_argumento_e_sem_variavel_e_erro(monkeypatch):
-    """Falta de argumento e variável gera erro com saída."""
+    """Falta de argumento e variavel gera erro com saida."""
     monkeypatch.delenv("SUJO", raising=False)
     monkeypatch.delenv("LIMPO", raising=False)
     with pytest.raises(SystemExit):
@@ -279,3 +279,95 @@ def test_saida_sai_do_ambiente(monkeypatch):
     monkeypatch.setenv("LIMPO", "/d/b.csv")
     monkeypatch.setenv("SAIDA", "/dados/runs")
     assert cli._argumentos([]).saida == "/dados/runs"
+
+
+def test_construir_agentes_respeita_a_sobreposicao_por_papel(monkeypatch):
+    """MODELO_<PAPEL> chega ao agente daquele papel; os outros ficam no geral."""
+    from limpeza import llm
+
+    registrado = {}
+
+    class _ClienteFalso:
+        def with_structured_output(self, schema):
+            return schema
+
+    def _espiao(provedor, modelo, segundos):
+        registrado.setdefault(modelo, 0)
+        registrado[modelo] += 1
+        return _ClienteFalso()
+
+    monkeypatch.setattr(config, "MODELO_LLM", "geral")
+    monkeypatch.setattr(config, "MODELOS_POR_PAPEL", {"deteccao": "X"})
+    monkeypatch.setattr(config, "TIMEOUT_LLM", None)
+    monkeypatch.setattr(llm, "cliente", _espiao)
+
+    pipeline._construir_agentes()
+
+    assert registrado == {"X": 1, "geral": 3}
+
+
+def test_sem_modelo_no_cli_a_sobreposicao_por_papel_sobrevive(monkeypatch):
+    """--modelo ausente nao pode sobrescrever MODELO_LLM: era o bug do nivel 1."""
+    monkeypatch.setattr(config, "MODELO_LLM", "do-ambiente")
+    args = cli._argumentos(["--sujo", "/d/a.csv", "--limpo", "/d/b.csv"])
+    assert args.modelo is None
+    cli._aplicar_config(args)
+    assert config.MODELO_LLM == "do-ambiente"
+
+
+def test_modelo_no_cli_vence_tudo(monkeypatch):
+    """Com --modelo explicito, o nivel 1 da precedencia dispara de proposito."""
+    monkeypatch.setattr(config, "MODELO_LLM", "do-ambiente")
+    args = cli._argumentos(["--sujo", "/d/a.csv", "--limpo", "/d/b.csv",
+                            "--modelo", "do-cli"])
+    cli._aplicar_config(args)
+    assert config.MODELO_LLM == "do-cli"
+
+
+def test_avisa_quando_nenhuma_coluna_recebeu_regra(capsys):
+    """LLM fora do ar termina com exit 0; o aviso e' a unica janela do usuario."""
+    trabalhos = [Trabalho(coluna=_coluna("a"), amostra=None,
+                          detector=deteccao.detector_nulo("caiu")),
+                 Trabalho(coluna=_coluna("b"), amostra=None,
+                          detector=deteccao.detector_nulo("caiu"))]
+    pipeline._avisar_limpador_vazio(trabalhos)
+    saida = capsys.readouterr().out
+    assert "AVISO: 0/2 colunas receberam regra de deteccao" in saida
+
+
+def test_nao_avisa_quando_ao_menos_uma_coluna_tem_regra(capsys):
+    """Uma regra viva basta: o limpador nao esta vazio."""
+    from limpeza.tipos import Detector
+
+    trabalhos = [Trabalho(coluna=_coluna("a"), amostra=None,
+                          detector=deteccao.detector_nulo("caiu")),
+                 Trabalho(coluna=_coluna("b"), amostra=None,
+                          detector=Detector(codigo=DETECTA_OZ, funcao=None,
+                                            cadeia="sufixo oz"))]
+    pipeline._avisar_limpador_vazio(trabalhos)
+    assert "AVISO" not in capsys.readouterr().out
+
+
+def test_log_de_excecao_traz_tipo_e_mensagem():
+    """Com Ollama, '404' e 'connection refused' nao podem virar a mesma linha."""
+    from limpeza import erros
+
+    assert erros.descrever(RuntimeError("404 model not found")) == \
+        "RuntimeError: 404 model not found"
+    longa = erros.descrever(ValueError("x" * 500))
+    assert longa.startswith("ValueError: x") and longa.endswith("...")
+    assert len(longa) < 260
+    assert erros.descrever(RuntimeError()) == "RuntimeError"
+
+
+def test_deteccao_que_falha_registra_a_mensagem_na_cadeia(monkeypatch):
+    """O motivo do detector_nulo tambem carrega a mensagem, nao so' o tipo."""
+    def explodir(*_a, **_k):
+        raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(amostragem, "representantes", lambda coluna: _amostra())
+    monkeypatch.setattr(deteccao, "gerar_regra_deteccao", explodir)
+
+    trabalho = pipeline._processar_coluna(_coluna(), {"deteccao": None})
+
+    assert "connection refused" in trabalho.detector.cadeia

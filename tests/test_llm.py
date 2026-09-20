@@ -13,7 +13,7 @@ def _isola_config(monkeypatch):
     monkeypatch.setattr(config, "PROVEDOR", "openai")
     monkeypatch.setattr(config, "MODELO_LLM", "gpt-4o-mini")
     monkeypatch.setattr(config, "MODELOS_POR_PAPEL", {})
-    monkeypatch.delenv("TIMEOUT_LLM", raising=False)
+    monkeypatch.setattr(config, "TIMEOUT_LLM", None)
 
 
 def test_openai_e_o_default():
@@ -80,5 +80,14 @@ def test_timeout_muda_com_o_provedor():
 
 
 def test_timeout_llm_explicito_vence_o_default(monkeypatch):
-    monkeypatch.setenv("TIMEOUT_LLM", "42")
+    monkeypatch.setattr(config, "TIMEOUT_LLM", 42)
     assert llm.timeout_do_provedor("ollama") == 42
+
+
+def test_timeout_llm_invalido_nao_estoura_e_cai_no_default():
+    """Lixo em TIMEOUT_LLM e' ignorado; nunca vira traceback no start do container."""
+    assert config._segundos("nao-e-numero") is None
+    assert config._segundos("0") is None
+    assert config._segundos("-5") is None
+    assert config._segundos(None) is None
+    assert config._segundos(" 42 ") == 42

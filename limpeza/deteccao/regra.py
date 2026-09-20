@@ -2,7 +2,7 @@
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
 
-from .. import config, llm, sandbox
+from .. import llm, sandbox
 from ..esquemas import RegraDeteccao
 from ..tipos import Detector
 

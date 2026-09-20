@@ -22,7 +22,9 @@ def _argumentos(argv=None):
                     help="CSV de referencia (ou a variavel LIMPO)")
     ap.add_argument("--colunas", default="todas",
                     help="lista separada por virgula, ou 'todas'")
-    ap.add_argument("--modelo", default=config.MODELO_LLM)
+    ap.add_argument("--modelo", default=None,
+                    help="modelo para os quatro papeis. Sem ele vale MODELO_LLM "
+                         "ou a sobreposicao por papel (MODELO_DETECCAO etc.)")
     ap.add_argument("--saida", default=os.getenv("SAIDA", "runs"),
                     help="pasta base onde o run e' escrito (ou a variavel SAIDA)")
     ap.add_argument("--iteracoes-deteccao", type=int, default=config.ITERACOES_DETECCAO,
@@ -42,7 +44,9 @@ def _argumentos(argv=None):
 
 
 def _aplicar_config(args) -> None:
-    config.MODELO_LLM = args.modelo
+    # --modelo ausente e' None: preserva MODELO_LLM e a sobreposicao por papel.
+    if args.modelo is not None:
+        config.MODELO_LLM = args.modelo
     config.ITERACOES_DETECCAO = args.iteracoes_deteccao
     config.AMOSTRAS_POR_ITERACAO = args.amostras_iter
     config.DIR_RUNS = Path(args.saida)

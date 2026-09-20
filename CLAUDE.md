@@ -81,16 +81,19 @@ Testes (nenhum gasta API — usam dublês de LLM e o limpador congelado):
 
 ### Em container
 
-A imagem traz o MiniLM assado dentro e entra num stack com o Ollama; nada sai
-da rede. O build precisa dos dois arquivos do modelo no contexto
-(`all-MiniLM-L6-v2/onnx/model_O4.onnx` e `all-MiniLM-L6-v2/tokenizer.json`) —
-a pasta está no `.gitignore`, então quem builda copia antes. O README tem o
-comando e o ciclo de trabalho no Portainer; aqui fica só o essencial:
+A imagem traz o MiniLM assado dentro e entra num stack com o Ollama: **o dado
+do usuário não sai da rede** (o stack ainda puxa imagem e modelo da internet —
+é a saída do *dado* que não existe). Os dois arquivos do modelo
+(`all-MiniLM-L6-v2/onnx/model_O4.onnx` e `all-MiniLM-L6-v2/tokenizer.json`)
+**são versionados**, para o build por Git do Portainer funcionar sem shell no
+servidor. O container roda como usuário não-root (uid 10001, ver
+`docs/DECISOES.md#container-nao-root`). O README tem o ciclo de trabalho no
+Portainer; aqui fica só o essencial:
 
 ```bash
 docker build -t limpeza-poc .
 docker run --rm limpeza-poc --help
-docker compose up -d ollama arquivos
+docker compose up -d ollama
 ```
 
 O serviço `poc` do `docker-compose.yml` é um **job one-shot** (`restart: "no"`):
@@ -111,6 +114,7 @@ limpeza/
   config.py                 tudo que é ajustável (modelo, clusters, iterações)
   esquemas.py               contratos pydantic entre os agentes LLM
   llm.py                    o único lugar que sabe que há mais de um provedor
+  erros.py                  formato único de exceção no log (tipo + mensagem)
 
   dados.py                  etapa 1 — carga literal dos dois CSVs → Tabela
   amostragem.py             etapa 2 — MiniLM ONNX + KMeans → representantes + rótulos
@@ -129,7 +133,7 @@ limpeza/
   relatorio.py              artefatos por execução (cadeias_deteccao.md, cascata.md, ...)
 
 Dockerfile                  imagem da POC, com os dois arquivos do MiniLM dentro
-docker-compose.yml          stack: ollama + arquivos + a POC como job one-shot
+docker-compose.yml          stack: ollama + a POC como job one-shot
 ```
 
 A numeração é a das chamadas em `gerar_limpador`, logo abaixo, e os docstrings
@@ -155,6 +159,7 @@ def gerar_limpador(caminho_sujo, caminho_limpo, colunas=None,
     trabalhos = []
     for coluna in tabela.colunas:
         trabalhos.append(_processar_coluna(coluna, agentes))
+    _avisar_limpador_vazio(trabalhos)
 
     mascara = deteccao.construir_mascara(trabalhos, tabela)
     corrigido = correcao.rodar_cascata(trabalhos, tabela, mascara, agentes)
@@ -213,7 +218,7 @@ A superfície do módulo é pequena de propósito:
 | `construir(schema, papel, modelo=None)` | o que os agentes chamam: devolve o cliente já amarrado ao schema pydantic |
 | `cliente(provedor, modelo, segundos)` | o `if` do provedor, cru, sem schema |
 | `modelo_do_papel(papel)` | `MODELO_<PAPEL>` se existir, senão `MODELO_LLM` |
-| `timeout_do_provedor(provedor)` | `TIMEOUT_LLM` se existir, senão o default do provedor |
+| `timeout_do_provedor(provedor)` | `config.TIMEOUT_LLM` se existir, senão o default do provedor |
 | `ProvedorDesconhecido(ValueError)` | o que `cliente` levanta num `PROVEDOR` que não conhece |
 
 Os papéis são quatro, e o nome é a chave de tudo: `deteccao`,
@@ -223,16 +228,25 @@ Os papéis são quatro, e o nome é a chave de tudo: `deteccao`,
 
 Explícito → papel → geral:
 
-1. o argumento `modelo=` de `construir` (só `escolher_modelo.py` usa hoje);
+1. o argumento `modelo=` de `construir` — `escolher_modelo.py`, e
+   `main.py --modelo`, que escreve `config.MODELO_LLM` **só quando é passado**;
 2. `MODELO_DETECCAO`, `MODELO_ESPECIFICADOR`, `MODELO_CODIGO`, `MODELO_FD` —
    a sobreposição por papel, montada em `config.MODELOS_POR_PAPEL`. Vazio não
    conta como valor: cai para o geral;
-3. `MODELO_LLM` — o geral, que `main.py --modelo` também escreve.
+3. `MODELO_LLM` — o geral.
+
+**`pipeline.py::_construir_agentes` chama os quatro construtores SEM argumento
+de modelo**, de propósito: é o `None` fluindo até `llm.modelo_do_papel` que
+mantém o nível 2 vivo. Passar `config.MODELO_LLM` ali — como já esteve — faz o
+nível 1 disparar sempre e mata a sobreposição por papel em silêncio, com a
+suíte verde. `tests/test_pipeline.py::test_construir_agentes_respeita_a_sobreposicao_por_papel`
+é o teste que trava isso; teste sobre `llm.construir` sozinho **não** pega.
 
 ### Timeout, e o que o `ChatOllama` não tem
 
 O default é **180s no `openai` e 900s no `ollama`**
-(`config.TIMEOUT_POR_PROVEDOR`); `TIMEOUT_LLM` sobrepõe os dois. Os 900s não
+(`config.TIMEOUT_POR_PROVEDOR`); a variável `TIMEOUT_LLM`, lida uma única vez
+em `config.py` (valor não-inteiro ou `<= 0` é ignorado), sobrepõe os dois. Os 900s não
 são folga decorativa: uma chamada em CPU já levou 808s nesta POC.
 
 **`ChatOllama` 1.1 não aceita `timeout` nem `max_retries` no construtor** —
@@ -268,7 +282,10 @@ quatro de uma vez. `--repeticoes` muda o denominador, que é 3 por padrão.
 
 Sai uma linha por papel com dois números: quantas vezes o schema foi
 preenchido e, nos dois papéis que geram código, quantas vezes o portão AST
-aceitou o resultado.
+aceitou o resultado. O portão de cada caso é um **callable** em `CASOS` —
+`regra.materializar` na detecção e `sandbox.validar` no código —, nunca um
+dicionário de `nome_funcao`/`nome_argumento`: é assim que a ferramenta mede o
+degrau real do pipeline sem virar um 11º ponto da lista da seção 8.
 
 **O critério de aprovação é a linha da detecção.** Um modelo que preenche o
 schema mas cujo `detectar(col)` o portão rejeita produz **limpador vazio** —
@@ -330,12 +347,12 @@ run.
 - **Não** comentar: histórico ("antes isso era..."), medição ("reduz 40% do
   tempo"), comparação com o ZeroDC, plano de IA ("aqui poderíamos...").
   Comentário descreve a mecânica do que está ali, ou não existe.
-- Densidade atual: **12,2%** em 2.540 linhas. `tests/medir_verbosidade.py`
+- Densidade atual: **12,8%** em 2.590 linhas. `tests/medir_verbosidade.py`
   mede; use antes de commitar uma tarefa que mexe em muitos arquivos.
 
 ### Exceções
 
-São **18**, sendo 15 no código do repositório e 3 dentro da string `_ESTATICO` de
+São **19**, sendo 16 no código do repositório e 3 dentro da string `_ESTATICO` de
 `empacotar.py` — estes últimos rodam no limpador gerado, não aqui. A regra é:
 exceção existe onde a falha tem um comportamento de degradação **nomeado**,
 nunca como rede genérica. Cite função, não número de linha: linha muda, função
@@ -344,6 +361,7 @@ não.
 | Onde | O que degrada, e para quê |
 |---|---|
 | **`pipeline.py::_processar_coluna`** (2) | **a fronteira de resiliência do run.** Detecção falhou → `detector_nulo`, a coluna não é marcada; refino falhou → fica a regra de 1-passe, que já foi validada. Não acrescente uma segunda fronteira paralela. |
+| `config.py::_segundos` | `TIMEOUT_LLM` com lixo é ignorado e cai no default do provedor — variável de ambiente ruim não vira traceback no start do container |
 | `correcao/cascata.py::rodar_cascata` | uma coluna ruim não derruba o run; as células marcadas dela viram flag |
 | `correcao/cascata.py::rodar_coluna` | regra de correção que explode numa célula deixa a célula intacta, e ela escala |
 | `deteccao/mascara.py::aplicar_detectores` | `detectar(col)` pode explodir na chamada ou na coerção; a coluna fica zerada com log, sem crash |
@@ -357,7 +375,7 @@ não.
 
 ### Loops
 
-São **44** (incluindo `avaliar_limpador.py` e `escolher_modelo.py`). Colapse loops **paralelos** —
+São **45** (incluindo `avaliar_limpador.py` e `escolher_modelo.py`). Colapse loops **paralelos** —
 dois `for` sobre a mesma sequência viram um. Mantenha os que **carregam
 estado** entre iterações: o escalonamento célula a célula da cascata
 (`pendentes`/`restantes`) e o loop de refino são estado acumulado, e fundi-los
@@ -372,7 +390,7 @@ A detecção hoje é **intra-coluna**: o contrato é
 booleano por linha, sem olhar as outras colunas. O **próximo projeto do
 usuário** é trocar esse contrato por uma forma cross-column.
 
-Essa restrição está concentrada em **11 pontos, 8 arquivos**. Ela está
+Essa restrição está concentrada em **10 pontos, 7 arquivos**. Ela está
 concentrada de propósito: se uma tarefa espalhar esse conhecimento, o próximo
 projeto passa a ter que redescobrir o contrato em vez de trocá-lo num lugar
 só.
@@ -389,14 +407,9 @@ só.
 | 8 | `limpeza/deteccao/mascara.py` | aplica `detectar(col)` uma vez por coluna, posicional | não |
 | 9 | `limpeza/esquemas.py::RegraDeteccao` | docstring da classe e `description` do campo `codigo` repetem o contrato | não |
 | 10 | `limpeza/empacotar.py` | cópia congelada da mesma aplicação, no limpador gerado | não |
-| 11 | `escolher_modelo.py::CASOS` | o caso `deteccao` repete `nome_funcao="detectar"`, `nome_argumento="col"`, `series_mode=True` para chamar o portão | não — chegou com a ferramenta de escolha de modelo |
 
-**Regra para qualquer tarefa daqui em diante:** esses 11 pontos continuam
-sendo os *únicos* lugares que sabem que a detecção é intra-coluna. O 11º não
-estava na lista original: ele entrou com `escolher_modelo.py` (projeto
-provedor-local, set/2026), e está registrado aqui em vez de escondido — quem
-trocar o contrato tem de trocá-lo também, ou a ferramenta passa a medir um
-contrato que não existe mais. Em
+**Regra para qualquer tarefa daqui em diante:** esses 10 pontos continuam
+sendo os *únicos* lugares que sabem que a detecção é intra-coluna. Em
 particular, `Detector` guarda `codigo`/`funcao` sem interpretar a assinatura
 (seção 4). A máscara, porém, **não** é `DataFrame[bool]` dentro da POC: ela
 nasce `dtype=int` em `deteccao/mascara.py`, e `correcao/cascata.py` e
@@ -404,7 +417,7 @@ nasce `dtype=int` em `deteccao/mascara.py`, e `correcao/cascata.py` e
 (`empacotar.py::_mascara`) reconstrói a sua própria versão `bool`. Não
 acrescente um décimo primeiro ponto.
 
-Lista original (10 pontos): `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`,
+Lista original: `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`,
 seção 9. Racional: `docs/DECISOES.md#deteccao-intra-coluna`.
 
 ---

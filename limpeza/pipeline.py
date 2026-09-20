@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import (amostragem, config, correcao, dados, deteccao, empacotar,
-               metricas, relatorio)
+               erros, metricas, relatorio)
 from .correcao import fd, regras
 from .tipos import Coluna, Trabalho
 
@@ -21,6 +21,7 @@ def gerar_limpador(caminho_sujo, caminho_limpo, colunas=None,
     trabalhos = []
     for coluna in tabela.colunas:
         trabalhos.append(_processar_coluna(coluna, agentes))
+    _avisar_limpador_vazio(trabalhos)
 
     mascara = deteccao.construir_mascara(trabalhos, tabela)
     corrigido = correcao.rodar_cascata(trabalhos, tabela, mascara, agentes)
@@ -42,12 +43,12 @@ def _processar_coluna(coluna: Coluna, agentes: dict) -> Trabalho:
     try:
         detector = deteccao.gerar_regra_deteccao(coluna, amostra, agentes["deteccao"])
     except Exception as exc:  # noqa: BLE001 -- sem regra: a coluna nao e' marcada
-        print(f"  {coluna.nome}: deteccao falhou ({type(exc).__name__}) "
+        motivo = erros.descrever(exc)
+        print(f"  {coluna.nome}: deteccao falhou ({motivo}) "
               "-> coluna nao marcada", flush=True)
         return Trabalho(coluna=coluna, amostra=amostra,
                         detector=deteccao.detector_nulo(
-                            f"deteccao falhou ({type(exc).__name__}); "
-                            "coluna nao marcada"))
+                            f"deteccao falhou ({motivo}); coluna nao marcada"))
 
     if config.ITERACOES_DETECCAO > 1 and detector.codigo != deteccao.DETECTA_NADA:
         print(f"  {coluna.nome}: refinando por "
@@ -58,18 +59,31 @@ def _processar_coluna(coluna: Coluna, agentes: dict) -> Trabalho:
             )
             _anunciar_oraculo(coluna, detector)
         except Exception as exc:  # noqa: BLE001 -- refino quebrou: fica o 1-passe
-            print(f"  {coluna.nome}: refino falhou ({type(exc).__name__}) "
+            print(f"  {coluna.nome}: refino falhou ({erros.descrever(exc)}) "
                   "-> mantem a regra de 1-passe", flush=True)
     return Trabalho(coluna=coluna, amostra=amostra, detector=detector)
 
 
+def _avisar_limpador_vazio(trabalhos: list) -> None:
+    """Avisa alto quando nenhuma coluna saiu com regra de deteccao."""
+    # Sem isso, LLM fora do ar termina com exit 0 e um limpador vazio: job verde.
+    com_regra = [t for t in trabalhos
+                 if t.detector is not None
+                 and t.detector.codigo != deteccao.DETECTA_NADA]
+    if trabalhos and not com_regra:
+        print(f"\n  AVISO: 0/{len(trabalhos)} colunas receberam regra de "
+              "deteccao; o limpador esta vazio. Verifique PROVEDOR, "
+              "MODELO_LLM e o log de falhas acima.\n", flush=True)
+
+
 def _construir_agentes() -> dict:
-    modelo = config.MODELO_LLM
+    """Constroi os quatro agentes sem fixar modelo: cada papel resolve o seu."""
+    # Sem argumento, `None` flui ate llm.modelo_do_papel: MODELO_<PAPEL> > MODELO_LLM.
     return {
-        "deteccao": deteccao.construir_agente(modelo),
-        "especificador": regras.construir_agente_especificador(modelo),
-        "codigo": regras.construir_agente_codigo(modelo),
-        "fd": fd.construir_agente(modelo),
+        "deteccao": deteccao.construir_agente(),
+        "especificador": regras.construir_agente_especificador(),
+        "codigo": regras.construir_agente_codigo(),
+        "fd": fd.construir_agente(),
     }
 
 

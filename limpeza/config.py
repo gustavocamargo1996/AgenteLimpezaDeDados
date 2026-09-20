@@ -6,6 +6,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Privacidade: tracing manda o prompt inteiro (com celulas reais) para a nuvem.
+for _VAR in ("LANGSMITH_TRACING_V2", "LANGCHAIN_TRACING_V2",
+             "LANGSMITH_TRACING", "LANGCHAIN_TRACING"):
+    os.environ[_VAR] = "false"
+
 RAIZ = Path(__file__).resolve().parent.parent
 
 # Modelo de embeddings local: nao e' dado do usuario, so' infra.
@@ -17,7 +22,19 @@ DIR_RUNS = RAIZ / "runs"
 
 MODELO_LLM = os.getenv("MODELO_LLM", "gpt-4o-mini")
 TEMPERATURA = 0.0
-TIMEOUT_LLM = 180
+
+
+def _segundos(bruto: str | None) -> int | None:
+    """Le TIMEOUT_LLM; valor nao-inteiro ou <=0 e' ignorado, sem traceback."""
+    try:
+        valor = int(str(bruto).strip())
+    except (TypeError, ValueError):
+        return None
+    return valor if valor > 0 else None
+
+
+# None significa "usa o default do provedor"; ver TIMEOUT_POR_PROVEDOR abaixo.
+TIMEOUT_LLM = _segundos(os.getenv("TIMEOUT_LLM"))
 
 PROVEDOR = os.getenv("PROVEDOR", "openai")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")

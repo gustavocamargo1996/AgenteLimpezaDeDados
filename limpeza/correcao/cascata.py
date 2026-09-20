@@ -1,5 +1,5 @@
 """Etapa 4: cascata de correcao codigo -> FD, com gate de 100% e escalonamento celula a celula."""
-from .. import config
+from .. import config, erros
 from ..tipos import Correcao
 from . import fd as fd_mod, regras
 
@@ -123,7 +123,7 @@ def rodar_cascata(trabalhos: list, tabela, mascara, agentes: dict):
                 mi_threshold=config.MI_THRESHOLD,
             )
         except Exception as exc:  # noqa: BLE001 -- 1 coluna ruim nao derruba o run
-            print(f"  {nome}: cascata falhou ({type(exc).__name__}) -> celulas "
+            print(f"  {nome}: cascata falhou ({erros.descrever(exc)}) -> celulas "
                   "marcadas viram flag", flush=True)
             correcoes, trilha = {}, _trilha_de_falha(nome, mascara[nome], exc)
         for idx, valor in correcoes.items():
@@ -176,7 +176,7 @@ def _passos(trilha: dict) -> list[dict]:
 
 def _trilha_de_falha(coluna: str, mascara_col, exc: Exception) -> dict:
     idx_marcados = list(mascara_col[mascara_col == 1].index)
-    motivo = f"cascata falhou: {type(exc).__name__}: {exc}"
+    motivo = f"cascata falhou: {erros.descrever(exc)}"
     return {
         "coluna": coluna,
         "marcadas": len(idx_marcados),

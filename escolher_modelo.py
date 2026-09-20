@@ -26,19 +26,19 @@ _SPEC = """{"coluna": "abv", "erro_detectado": true, "tipo_erro": "formato",
  "transformacao": {"tipo": "regex_sub", "padrao": "%$", "substituicao": ""},
  "exemplos": [{"de": "0.05%", "para": "0.05"}], "confianca": 0.95}"""
 
-# (schema, sistema, humano, argumentos, alvo do portao AST ou None)
+# (schema, sistema, humano, argumentos, portao a chamar com o codigo, ou None)
 CASOS = {
     "deteccao": (RegraDeteccao, regra_mod.SISTEMA, regra_mod.HUMANO,
                  {"coluna": "abv", "amostra": _SUJOS,
                   "total_linhas": 300, "total_distintos": 132},
-                 dict(nome_funcao="detectar", nome_argumento="col", series_mode=True)),
+                 regra_mod.materializar),
     "especificador": (RegraCorrecao, regras.SISTEMA_ESPECIFICADOR, regras.HUMANO_BUDGET,
                       {"coluna": "abv", "amostra": _ROTULADOS,
                        "total_linhas": 300, "total_distintos": 132},
                       None),
     "codigo": (CodigoGerado, regras.SISTEMA_CODIGO, regras.HUMANO_CODIGO,
                {"spec": _SPEC},
-               dict(nome_funcao="corrigir", nome_argumento="valor")),
+               sandbox.validar),
     "fd": (DependenciaFuncional, fd_mod.SISTEMA, fd_mod.HUMANO,
            {"dependente": "state", "candidatos": "brewery-name, city",
             "exemplos": '  - `brewery-name`="21st Amendment Brewery" -> `state`="CA"'},
@@ -69,7 +69,7 @@ def medir(modelo: str, repeticoes: int = 3) -> dict:
             if alvo is None:
                 continue
             try:
-                sandbox.validar(obj.codigo, **alvo)
+                alvo(obj.codigo)
                 portao_ok += 1
             except Exception:  # codigo rejeitado pelo portao: conta a parte
                 pass
@@ -96,7 +96,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description="Mede se um modelo consegue preencher os schemas da POC")
     ap.add_argument("--modelo", required=True, help="nome do modelo no provedor ativo")
-    ap.add_argument("--repeticoes", type=int, default=3)
+    ap.add_argument("--repeticoes", type=int, default=3,
+                    help="invocacoes por papel; e' o denominador do placar")
     args = ap.parse_args(argv)
 
     t0 = time.time()

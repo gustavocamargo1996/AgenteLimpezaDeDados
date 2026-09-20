@@ -2,7 +2,7 @@
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
 
-from .. import amostragem, config, sandbox
+from .. import amostragem, config, erros, sandbox
 from ..esquemas import RegraDeteccao
 from ..tipos import Detector
 from .oraculo import _amostrar_oraculo, _classificar
@@ -127,7 +127,7 @@ def _tentar_update(cadeia_update, coluna: str, codigo_atual: str, feedback: str)
             {"coluna": coluna, "codigo_atual": codigo_atual, "feedback": feedback}
         )
     except Exception as exc:  # noqa: BLE001 -- update nao pode derrubar o loop
-        return None, f"invoke falhou ({type(exc).__name__}: {exc})"
+        return None, f"invoke falhou ({erros.descrever(exc)})"
 
     codigo = (nova.codigo or "").strip()
     if not codigo:

@@ -1,10 +1,12 @@
 """O unico lugar do repositorio que sabe qual provedor de LLM existe."""
-import os
-
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 from . import config
+
+
+# Provedor fora de TIMEOUT_POR_PROVEDOR nao existe hoje; o piso e' o do openai.
+_PADRAO = 180
 
 
 class ProvedorDesconhecido(ValueError):
@@ -17,10 +19,10 @@ def modelo_do_papel(papel: str) -> str:
 
 
 def timeout_do_provedor(provedor: str) -> int:
-    """Timeout explicito de TIMEOUT_LLM, senao o default do provedor."""
-    if os.getenv("TIMEOUT_LLM"):
-        return int(os.getenv("TIMEOUT_LLM"))
-    return config.TIMEOUT_POR_PROVEDOR.get(provedor, config.TIMEOUT_LLM)
+    """Timeout explicito de config.TIMEOUT_LLM, senao o default do provedor."""
+    if config.TIMEOUT_LLM:
+        return config.TIMEOUT_LLM
+    return config.TIMEOUT_POR_PROVEDOR.get(provedor, _PADRAO)
 
 
 def cliente(provedor: str, modelo: str, segundos: int):

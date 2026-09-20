@@ -10,13 +10,17 @@ services:
     #     reservations:
     #       devices: [{capabilities: [gpu]}]
 
-  arquivos:
-    image: filebrowser/filebrowser
-    volumes:
-      - limpeza-dados:/srv
-    ports:
-      - "8080:80"
-    restart: unless-stopped
+  # COMENTADO POR SEGURANCA: filebrowser foi arquivado em 01/set/2026 (sem
+  # releases, sem correcao de advisory) e serviria o volume com os CSVs do
+  # usuario numa porta publica. O caminho primario e' o navegador de volumes
+  # do Portainer. Descomente so' com ciencia do risco.
+  # arquivos:
+  #   image: filebrowser/filebrowser
+  #   volumes:
+  #     - limpeza-dados:/srv
+  #   ports:
+  #     - "8080:80"
+  #   restart: unless-stopped
 
   poc:
     build: .

@@ -295,3 +295,51 @@ chamar o LLM de novo — reavaliar custa zero de API.
 `limpeza/amostragem.py::representantes`, chamado pela etapa 2 do pipeline
 (`limpeza/pipeline.py::_processar_coluna`) — não há mais nenhuma amostragem
 disparada do `main.py`.
+
+<a id="tracing-desligado"></a>
+## Tracing desligado
+
+**Decisão:** `limpeza/config.py` escreve `"false"` nas quatro variáveis de
+tracing do LangChain/LangSmith — `LANGSMITH_TRACING_V2`,
+`LANGCHAIN_TRACING_V2`, `LANGSMITH_TRACING` e `LANGCHAIN_TRACING` — logo após
+o `load_dotenv()`, sobrepondo o que já estiver no ambiente.
+
+**Por quê:** `langsmith` entra no venv como dependência transitiva do
+`langchain-core`, sem ninguém pedir, e qualquer uma daquelas quatro variáveis
+com `"true"` faz cada chamada de LLM ser espelhada para a nuvem da LangChain.
+Os prompts desta POC carregam **valores reais das células** do usuário: seriam
+os dados inteiros saindo da rede, silenciosamente, mesmo com
+`PROVEDOR=ollama`. `load_dotenv()` não resolve — ele não sobrepõe variável já
+definida no sistema operacional, que é exatamente o caso de uma máquina onde
+alguém habilitou tracing uma vez. É a mesma decisão de privacidade que faz
+`PROVEDOR` desconhecido falhar alto em vez de cair para `openai`: caminho para
+fora da rede não se ativa por omissão.
+
+**Onde:** `limpeza/config.py`, o laço logo abaixo de `load_dotenv()`.
+
+<a id="container-nao-root"></a>
+## Container não-root
+
+**Decisão:** o `Dockerfile` cria o usuário `limpeza` (uid fixo 10001), cede a
+ele `/app` e `/dados` e termina com `USER limpeza`. O `ENTRYPOINT` roda sem
+privilégio.
+
+**Por quê:** o container é o primeiro contexto em que código escrito por LLM
+executa fora da máquina de quem revisou o run — e o portão AST de
+`limpeza/sandbox.py` reduz superfície, mas **não é sandbox**. Com uid 0 e o
+volume de dados montado em escrita, um escape do portão escreveria em
+`/dados` como root e sairia do container com as capacidades do daemon. O uid
+não-root não fecha o buraco; tira o pior desfecho da mesa.
+
+**O custo, medido:** Docker semeia um volume nomeado **vazio** com o dono e o
+modo do diretório que existe na imagem naquele caminho — por isso o `mkdir -p
+/dados` e o `chown` **antes** do `USER` são obrigatórios: sem eles o volume
+nasceria `root:root` e a escrita falharia. Verificado: volume novo do compose
+monta como `limpeza:limpeza` e a POC escreve. Um volume que **já tem
+conteúdo** de um deploy anterior como root mantém o dono antigo e a escrita
+falha com `Permission denied` — a correção é um `chown -R 10001:10001` de uma
+vez só, que no Portainer sai como um container avulso e privilegiado. Está no
+README.
+
+**Onde:** `Dockerfile`, as três linhas do `RUN useradd ...` e o `USER
+limpeza`.

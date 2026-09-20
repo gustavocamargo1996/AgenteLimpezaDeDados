@@ -55,18 +55,81 @@ duas: nenhuma delas moveu um número publicado.
   não entram na imagem: entram por volume. Smoke do `Embedder` dentro do
   container: `similar` 0,5428 contra `distante` 0,1821.
 - **Stack do Portainer** (`docker-compose.yml`): `ollama` (modelos no volume
-  `ollama-modelos`, que sobrevive a redeploy), `arquivos` (filebrowser em
-  `:8080`, para subir CSV e baixar artefato) e `poc` como **job one-shot**
+  `ollama-modelos`, que sobrevive a redeploy) e `poc` como **job one-shot**
   (`restart: "no"`). `SUJO`, `LIMPO` e `SAIDA` viraram o default de
   `--sujo`/`--limpo`/`--saida` — na UI do Portainer editar variável é fácil e
   editar comando é desconfortável, e pela linha de comando nada mudou.
-- **Suíte de 87 para 106 testes**, todos sem API. Densidade de comentário:
-  12,2% em 2.540 linhas.
+- **Suíte de 87 para 114 testes**, todos sem API. Densidade de comentário:
+  12,8% em 2.590 linhas.
 - **Documentação**: seção nova no `CLAUDE.md` (provedores, precedência,
   timeout, o critério de escolha de modelo), seções "Rodando com modelo local"
-  e "Em container / Portainer" no `README.md` — inclusive o passo de copiar os
-  dois arquivos do MiniLM para o contexto de build, que o `.gitignore` não
-  versiona — e as variáveis novas no `.env.example`.
+  e "Em container / Portainer" no `README.md` e as variáveis novas no
+  `.env.example`.
+
+### Corrigido — revisão final antes do merge (19/set/2026)
+
+- **O serviço `arquivos` publicava os dados do usuário numa web app
+  arquivada.** A imagem `filebrowser/filebrowser` foi arquivada em
+  01/set/2026 (sem releases, sem correção para advisory aberto), estava em
+  `latest`, publicava em `0.0.0.0:8080` sem restrição de bind e servia o
+  volume com o CSV sujo, o CSV limpo e `correcoes.csv` — a tabela inteira,
+  célula a célula. **Comentada no `docker-compose.yml`**, com o motivo no
+  próprio arquivo. O ciclo de trabalho do `README.md` passou a usar o
+  navegador de volumes do Portainer.
+- **A sobreposição de modelo por papel estava morta.**
+  `pipeline.py::_construir_agentes` passava `config.MODELO_LLM` aos quatro
+  construtores; como esse valor nunca é vazio, o nível 1 da precedência
+  disparava sempre e `MODELOS_POR_PAPEL` nunca era consultado —
+  `MODELO_DETECCAO` e os três irmãos eram inertes, com a suíte verde. Agora
+  `_construir_agentes` chama os quatro **sem** argumento de modelo, e
+  `main.py --modelo` tem `default=None`: só escreve `config.MODELO_LLM`
+  quando é passado. A precedência real virou `--modelo` →
+  `MODELO_<PAPEL>` → `MODELO_LLM`. O teste novo é sobre
+  `_construir_agentes`, não sobre `llm.construir`: era essa a lacuna.
+- **Tracing do LangSmith desligado explicitamente.** `langsmith` entra como
+  dependência transitiva do `langchain-core`, e qualquer uma de
+  `LANGSMITH_TRACING_V2`, `LANGCHAIN_TRACING_V2`, `LANGSMITH_TRACING` ou
+  `LANGCHAIN_TRACING` com `"true"` no ambiente do sistema — que
+  `load_dotenv()` não sobrepõe — mandaria todo prompt, com células reais, para
+  a nuvem da LangChain, mesmo com `PROVEDOR=ollama`. `limpeza/config.py`
+  escreve `"false"` nas quatro. Ver `docs/DECISOES.md#tracing-desligado`.
+- **Os dois arquivos do MiniLM passaram a ser versionados**
+  (`all-MiniLM-L6-v2/onnx/model_O4.onnx` e `tokenizer.json`, Apache 2.0, da
+  `sentence-transformers`). O Portainer builda clonando o repositório e a
+  pasta estava no `.gitignore`: o `COPY` do `Dockerfile` falhava, e as duas
+  alternativas documentadas exigiam shell no servidor ou registry —
+  exatamente o que o usuário-alvo não tem. Agora o build por Git funciona
+  direto.
+- **Falha total do LLM não avisava.** Com todos os agentes falhando o run
+  completava, escrevia um limpador vazio e retornava 0 — no Portainer, um job
+  verde. `pipeline.py::_avisar_limpador_vazio` imprime `AVISO: 0/N colunas
+  receberam regra de deteccao` quando nenhuma coluna saiu com detector
+  diferente de `DETECTA_NADA`. O código de saída **não** mudou.
+- **O container roda como não-root** (usuário `limpeza`, uid 10001): é o
+  primeiro contexto em que código escrito por LLM executa com o volume de
+  dados montado em escrita. O `mkdir -p /dados` e o `chown` antes do `USER`
+  são o que faz o volume nomeado nascer com o dono certo. Ver
+  `docs/DECISOES.md#container-nao-root`.
+- **O 11º ponto da costura cross-column foi eliminado, não documentado.**
+  `escolher_modelo.py::CASOS` repetia `nome_funcao="detectar"`,
+  `nome_argumento="col"`, `series_mode=True`; os dois `alvo` viraram
+  **callables** (`regra.materializar` e `sandbox.validar`), que é o que o
+  pipeline realmente chama. A lista do `CLAUDE.md` seção 8 voltou a 10
+  pontos.
+- **Mensagem de exceção unificada** em `limpeza/erros.py::descrever`: tipo
+  **e** mensagem, truncada em 200 caracteres. `pipeline.py::_processar_coluna`
+  e `correcao/cascata.py` registravam só `type(exc).__name__` — com Ollama,
+  "404 model not found", "connection refused" e "timeout" viravam a mesma
+  linha, e o log é a única janela do usuário no Portainer.
+- **`TIMEOUT_LLM` tem um leitor só.** `config.py` lê a variável (valor
+  não-inteiro ou `<= 0` é ignorado, sem traceback) e `llm.py` consulta apenas
+  `config.TIMEOUT_LLM`; antes `llm.timeout_do_provedor` chamava
+  `os.getenv` duas vezes e `config.TIMEOUT_LLM` era uma constante fixa que
+  ignorava a variável de mesmo nome.
+- Miudezas do mesmo passe: import de `config` não usado em
+  `deteccao/regra.py`; `--repeticoes` sem `help=`; `AS base` nomeando um
+  estágio nunca referenciado no `Dockerfile`; `tests/` fora do
+  `.dockerignore`; acentos em docstrings de `tests/test_pipeline.py`.
 
 **Simplificação do gerador de limpadores (30/ago/2026)** — as duas seções
 abaixo, `Removido` e `Alterado`, são dela. O objetivo declarado era reduzir a

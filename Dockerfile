@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS base
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -13,5 +13,12 @@ ENV MODELO_EMBEDDING=/modelo
 
 COPY limpeza/ ./limpeza/
 COPY main.py avaliar_limpador.py escolher_modelo.py ./
+
+# Codigo escrito por LLM roda aqui dentro: uid fixo nao-root, nunca 0.
+# /dados e' o ponto de montagem do volume; criado e cedido antes do USER.
+RUN useradd --uid 10001 --create-home limpeza \
+    && mkdir -p /dados \
+    && chown -R limpeza:limpeza /dados /app
+USER limpeza
 
 ENTRYPOINT ["python", "main.py"]
