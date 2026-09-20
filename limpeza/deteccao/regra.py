@@ -1,9 +1,8 @@
 """Etapa 3: gera a regra de deteccao intra-coluna `detectar(col) -> pd.Series[bool]`."""
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 
-from .. import config, sandbox
+from .. import config, llm, sandbox
 from ..esquemas import RegraDeteccao
 from ..tipos import Detector
 
@@ -66,13 +65,8 @@ _AMOSTRAS_FUMACA = ["12.0 oz", "", "N/A", "17.0", "Portland CA"]
 
 
 def construir_agente(modelo: str | None = None):
-    llm = ChatOpenAI(
-        model=modelo or config.MODELO_LLM,
-        temperature=config.TEMPERATURA,
-        timeout=config.TIMEOUT_LLM,
-        max_retries=2,
-    )
-    return llm.with_structured_output(RegraDeteccao)
+    """Agente que devolve a regra de deteccao de uma coluna."""
+    return llm.construir(RegraDeteccao, "deteccao", modelo=modelo)
 
 
 def _formatar_amostra(representantes_sujos: list[str], contagem: dict) -> str:

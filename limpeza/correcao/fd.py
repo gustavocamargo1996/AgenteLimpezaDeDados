@@ -1,9 +1,8 @@
 """Etapa 4, camada 2 da cascata: propoe e aplica uma dependencia funcional `A -> B`."""
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from sklearn.metrics import mutual_info_score
 
-from .. import config
+from .. import config, llm
 from ..esquemas import DependenciaFuncional
 
 
@@ -57,13 +56,8 @@ Escolha o determinante unico (ou "None")."""
 
 
 def construir_agente(modelo: str | None = None):
-    llm = ChatOpenAI(
-        model=modelo or config.MODELO_LLM,
-        temperature=config.TEMPERATURA,
-        timeout=config.TIMEOUT_LLM,
-        max_retries=2,
-    )
-    return llm.with_structured_output(DependenciaFuncional)
+    """Agente que propoe a dependencia funcional de uma coluna."""
+    return llm.construir(DependenciaFuncional, "fd", modelo=modelo)
 
 
 def _formatar_exemplos(rotulados: list[dict], df, dependente: str) -> str:

@@ -1,8 +1,7 @@
 """Etapa 4, camada 1: agente especificador (JSON) e agente tradutor (codigo) da correcao."""
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 
-from .. import config, sandbox
+from .. import config, llm, sandbox
 from ..esquemas import CodigoGerado, RegraCorrecao
 
 # --- Agente 1: especificador ---
@@ -70,13 +69,8 @@ def _formatar_amostra(itens: list[dict]) -> str:
 
 
 def construir_agente_especificador(modelo: str | None = None):
-    llm = ChatOpenAI(
-        model=modelo or config.MODELO_LLM,
-        temperature=config.TEMPERATURA,
-        timeout=config.TIMEOUT_LLM,
-        max_retries=2,
-    )
-    return llm.with_structured_output(RegraCorrecao)
+    """Agente 1: especifica a regra de correcao a partir dos rotulados."""
+    return llm.construir(RegraCorrecao, "especificador", modelo=modelo)
 
 
 def especificar(
@@ -151,13 +145,8 @@ Corrija e devolva a funcao novamente, respeitando o contrato rigido."""
 
 
 def construir_agente_codigo(modelo: str | None = None):
-    llm = ChatOpenAI(
-        model=modelo or config.MODELO_LLM,
-        temperature=config.TEMPERATURA,
-        timeout=config.TIMEOUT_LLM,
-        max_retries=2,
-    )
-    return llm.with_structured_output(CodigoGerado)
+    """Agente 2: traduz a especificacao JSON em `corrigir(valor)`."""
+    return llm.construir(CodigoGerado, "codigo", modelo=modelo)
 
 
 def traduzir(regra: RegraCorrecao, agente=None) -> dict:
