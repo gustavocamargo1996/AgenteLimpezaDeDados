@@ -123,6 +123,8 @@ _CORRETORES = {
     'city': _corrigir_city,
 }
 
+DEPENDENCIAS = {}
+
 FDS = {
     'city': ('brewery-name', 'city'),
     'state': ('brewery_id', 'state'),
@@ -131,14 +133,16 @@ FDS = {
 COLUNAS = ['id', 'beer-name', 'style', 'ounces', 'abv', 'ibu', 'brewery_id', 'brewery-name', 'city', 'state']
 
 def _mascara(df):
-    """Espelho de deteccao.construir_mascara: mascara BOOL por coluna, posicional.
+    """Espelho de deteccao.construir_mascara + detectar_dependencia: mascara BOOL.
 
-    Inicializa tudo-False no shape do df. Por coluna COM detector, chama
-    `_detectar_<col>(df[col])` UMA vez e coage `res.fillna(False).astype(bool)`,
-    atribuindo por POSICAO via `.to_numpy()` (nunca boolean-index por indice). Se
-    o detector lanca, nao devolve Series ou devolve tamanho errado, a coluna
-    INTEIRA fica nao-marcada. Coluna SEM detector (ex.: o determinante da FD) ->
-    tudo-False.
+    1. Intra-coluna: inicializa tudo-False no shape do df. Por coluna COM
+       detector, chama `_detectar_<col>(df[col])` UMA vez e coage
+       `res.fillna(False).astype(bool)`, atribuindo por POSICAO via `.to_numpy()`
+       (nunca boolean-index por indice). Se o detector lanca, nao devolve Series
+       ou devolve tamanho errado, a coluna INTEIRA fica nao-marcada.
+    2. Dependencia funcional: por coluna em DEPENDENCIAS, soma (OU) as celulas que
+       desviam da moda condicionada. Toda FD le a mascara INTRA do passo 1, nunca
+       a que esta sendo acumulada -- a mesma ordem da POC, que evita circularidade.
     """
     mascara = pd.DataFrame(False, index=df.index, columns=df.columns)
     n = len(df)
@@ -156,7 +160,35 @@ def _mascara(df):
         except Exception:
             continue
         mascara[coluna] = marca
+    intra = mascara.copy()
+    for coluna, (det, dep) in DEPENDENCIAS.items():
+        if det not in df.columns or dep not in df.columns:
+            continue
+        mascara[coluna] = mascara[coluna] | _desvios_da_moda(df, intra, det, dep)
     return mascara
+
+
+def _desvios_da_moda(df, mascara, det, dep):
+    """Espelho de deteccao/dependencia.py: True onde `dep` difere da moda do grupo.
+
+    A moda de `dep` em cada grupo `df[det] == valor` usa so' as linhas com
+    `mascara[det]` e `mascara[dep]` nao-marcados (DUPLO FILTRO, igual a
+    fd.moda_condicionada). Empate: `mode().iloc[0]`, o menor valor. Grupo sem
+    linha compativel nao marca ninguem.
+    """
+    marca = pd.Series(False, index=df.index)
+    for valor_det in df[det].unique():
+        no_grupo = df[det] == valor_det
+        condicao = (
+            no_grupo
+            & (mascara[det] == False)  # noqa: E712 -- espelha mascara[det]==0 da POC
+            & (mascara[dep] == False)  # noqa: E712
+        )
+        valores = df.loc[condicao, dep]
+        if valores.empty:
+            continue
+        marca |= no_grupo & (df[dep] != valores.mode().iloc[0])
+    return marca
 
 
 def _aplicar_fd(df, mascara, col, det, dep):
