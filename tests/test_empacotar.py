@@ -174,3 +174,25 @@ def test_dependencias_so_leva_fd_aprovada_na_deteccao(tmp_path):
 
     assert mod.DEPENDENCIAS == {"State": ("City", "State")}
     assert mod.FDS == {"State": ("City", "State"), "city": ("brewery", "city")}
+
+
+def test_limpador_com_fd_injetada_corrige_o_environment(tmp_path):
+    """Sem nenhum detector intra, so' a FD empacotada acha e corrige State e Climate_Zone."""
+    from avaliar_limpador import avaliar
+
+    fixtures = Path(__file__).parent / "fixtures"
+    sujo = fixtures / "environment_dirty_300.csv"
+    fds = {"State": ("City", "State"), "Climate_Zone": ("City", "Climate_Zone")}
+    colunas = list(pd.read_csv(sujo, nrows=0).columns)
+    caminho = empacotar.escrever_limpador(
+        caminho=tmp_path / "limpador_env.py", dataset="environment",
+        detectores_codigo={}, colunas=colunas,
+        plano_correcao={dep: [{"tipo": "fd", "determinante": det, "dependente": dep}]
+                        for dep, (det, _) in fds.items()},
+        dependencias=fds,
+    )
+    medida = avaliar(caminho, sujo, fixtures / "environment_clean_300.csv")["colunas"]
+    for coluna, erros in (("State", 54), ("Climate_Zone", 26)):
+        assert medida[coluna]["erros"] == erros
+        assert medida[coluna]["mudancas"] == erros
+        assert medida[coluna]["tp"] == erros

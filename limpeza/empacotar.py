@@ -216,13 +216,6 @@ def _montar_cabecalho(origem: str, dataset: str, colunas: list[str],
         "As regras generalizam a FORMA do erro (o mesmo padrao/marcador visto na",
         "amostra), NAO qualquer erro na mesma estrutura de tabela. Um erro de",
         "forma diferente passa batido.",
-        "",
-        "LIMITACAO CONHECIDA -- deteccao por dependencia funcional (FD): a POC",
-        "roda uma segunda via de deteccao, entre colunas (ex.: State fixado por",
-        "City), que entra nas metricas do run (precisao/recall/F1 publicados).",
-        "Essa via NAO esta reproduzida neste arquivo -- a mascara abaixo usa so'",
-        "os detectores intra-coluna de _DETECTORES. Celula que so' a FD",
-        "encontrou no run passa batido neste limpador.",
     ]
     if coocorrencia:
         linhas += [
