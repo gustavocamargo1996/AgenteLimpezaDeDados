@@ -32,10 +32,13 @@ def _marcar_coluna(trabalho, df, mascara_intra, candidatos, agente):
     if not fd_mod.validar_fd(fd, rotulados, df, mascara_intra, nome):
         print(f"  {nome}: FD `{fd.determinante}` reprovada no gate -> sem marca", flush=True)
         return None
-    trabalho.dependencia = fd
     print(f"  {nome}: FD `{fd.determinante}` -> `{nome}` aprovada; marcando desvios...",
           flush=True)
-    return _desvios_da_moda(df, mascara_intra, fd.determinante, nome)
+    # So' grava no Trabalho DEPOIS de marcar: se isto explodir, a FD nao fica
+    # residente sem uma marca correspondente.
+    marca = _desvios_da_moda(df, mascara_intra, fd.determinante, nome)
+    trabalho.dependencia = fd
+    return marca
 
 
 def _desvios_da_moda(df, mascara, determinante, dependente) -> pd.Series:

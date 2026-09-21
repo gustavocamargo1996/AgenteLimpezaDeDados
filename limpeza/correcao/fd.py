@@ -1,4 +1,4 @@
-"""Etapa 4, camada 2 da cascata: propoe e aplica uma dependencia funcional `A -> B`."""
+"""Dependencia funcional `A -> B`: proposta, gate e aplicacao, usadas pela etapa 3b (deteccao) e pela camada 2 da etapa 4 (correcao)."""
 from langchain_core.prompts import ChatPromptTemplate
 from sklearn.metrics import mutual_info_score
 

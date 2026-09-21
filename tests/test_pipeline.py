@@ -150,11 +150,13 @@ def test_espinha_absorve_os_dicionarios_paralelos_num_trabalho(tmp_path, monkeyp
 
 
 def test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada(tmp_path, monkeypatch):
-    """A ordem que evita circularidade: a FD recebe SEMPRE a mascara anterior."""
+    """A ordem que evita circularidade, e a marca da FD sobrevivendo ate a cascata."""
     _fingir_agentes(monkeypatch)
     recebidas = []
     intra_capturada = {}
+    mascaras_da_cascata = []
     original_construir_mascara = deteccao.construir_mascara
+    original_rodar_cascata = pipeline.correcao.rodar_cascata
 
     def espiar_mascara(trabalhos, tabela):
         m = original_construir_mascara(trabalhos, tabela)
@@ -169,8 +171,13 @@ def test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada(tmp_path, monk
         fake.loc[fake.index[0], "city"] = 1
         return fake
 
+    def espiar_cascata(trabalhos, tabela, mascara, agentes):
+        mascaras_da_cascata.append(mascara.copy())
+        return original_rodar_cascata(trabalhos, tabela, mascara, agentes)
+
     monkeypatch.setattr(deteccao, "construir_mascara", espiar_mascara)
     monkeypatch.setattr(deteccao, "detectar_dependencia", fd_falsa)
+    monkeypatch.setattr(pipeline.correcao, "rodar_cascata", espiar_cascata)
 
     pipeline.gerar_limpador(
         caminho_sujo=FIXTURES / "beers_dirty_300.csv",
@@ -182,6 +189,15 @@ def test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada(tmp_path, monk
     assert recebidas, "detectar_dependencia nao foi chamada"
     for recebida in recebidas:
         pd.testing.assert_frame_equal(recebida, intra_capturada["valor"])
+
+    # A marca da fd_falsa (que a intra nunca produziria) tem de sobreviver ate
+    # a cascata: se o pipeline descartasse o retorno de detectar_dependencia
+    # (ex.: `mascara = mascara_intra`), esta celula chegaria zerada.
+    idx0 = intra_capturada["valor"].index[0]
+    assert int(intra_capturada["valor"].at[idx0, "city"]) == 0, "premissa: intra nao marcou"
+    assert mascaras_da_cascata, "rodar_cascata nao foi chamado"
+    assert int(mascaras_da_cascata[0].at[idx0, "city"]) == 1, (
+        "a marca da FD nao chegou na mascara combinada que a cascata recebeu")
 
 
 def test_fd_do_beers_marca_um_unico_falso_positivo_conhecido():

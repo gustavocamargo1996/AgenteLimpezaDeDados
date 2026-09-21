@@ -210,3 +210,35 @@ def test_cascata_reaproveita_a_fd_em_vez_de_propor(monkeypatch):
     cascata.rodar_cascata(trabalhos, tabela, mascara,
                           {"especificador": None, "codigo": None, "fd": None})
     assert chamou == [], "a cascata propos FD de novo em vez de reaproveitar"
+
+
+def test_cascata_revalida_o_gate_da_fd_reaproveitada(monkeypatch):
+    """Reaproveitar a FD aprovada na deteccao nao dispensa o gate na cascata:
+    a mascara aqui e' a combinada, com informacao nova (ver docs/DECISOES.md#gates-de-100)."""
+    from limpeza.correcao import cascata, fd as fd_real
+
+    chamadas = []
+    monkeypatch.setattr(fd_real, "validar_fd",
+                        lambda *a, **k: chamadas.append(a) or False)
+    monkeypatch.setattr(cascata, "_camada_codigo",
+                        lambda coluna, rotulados, agentes: (
+                            types.SimpleNamespace(
+                                transformacao=types.SimpleNamespace(tipo="nenhuma"),
+                                descricao_padrao="fake: sem codigo"),
+                            None, ""))
+
+    tabela = _tabela_environment(["State"])
+    trabalhos = _trabalhos(tabela)
+    trabalhos[0].dependencia = DependenciaFuncional(
+        determinante="City", dependente="State", justificativa="ja aprovada na deteccao")
+    mascara = _mascara_zerada(tabela)
+    mascara.loc[1, "State"] = 1  # uma celula marcada, para a cascata ter o que fazer
+
+    cascata.rodar_cascata(trabalhos, tabela, mascara,
+                          {"especificador": None, "codigo": None, "fd": None})
+
+    assert chamadas, "validar_fd nao foi chamado: a FD reaproveitada nao foi revalidada"
+    trilha = trabalhos[0].correcao.trilha
+    assert trilha["gate_fd"] is False, "gate reprovado tinha de barrar a aplicacao"
+    assert trilha["contagem"]["fd"] == 0
+    assert trilha["contagem"]["nao_resolvida"] == 1, "celula reprovada tinha de escalar para flag"
