@@ -121,6 +121,23 @@ def test_fd_reprovada_nao_e_guardada_no_trabalho():
     assert getattr(trabalhos[0], "dependencia", None) is None
 
 
+def test_fd_aprovada_que_explode_ao_marcar_nao_fica_residente(monkeypatch):
+    """Sem marca correspondente, a FD residente seria reaproveitada pela cascata."""
+    tabela = _tabela_environment(["State"])
+    trabalhos = _trabalhos(tabela)
+    agente = _AgenteFalso(DependenciaFuncional(
+        determinante="City", dependente="State", justificativa="cidade fixa o estado"))
+
+    def explode(*_a, **_k):
+        raise RuntimeError("moda quebrou")
+
+    monkeypatch.setattr(dependencia, "_desvios_da_moda", explode)
+    mascara = dependencia.detectar_dependencia(
+        trabalhos, tabela, _mascara_zerada(tabela), agente)
+    assert getattr(trabalhos[0], "dependencia", None) is None
+    assert int(mascara["State"].sum()) == 0
+
+
 def test_fd_aprovada_e_guardada_no_trabalho():
     tabela = _tabela_environment(["State"])
     trabalhos = _trabalhos(tabela)

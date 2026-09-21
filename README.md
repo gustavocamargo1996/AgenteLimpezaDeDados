@@ -378,7 +378,7 @@ F1 de reparo. Não faz nenhuma chamada de LLM:
 .venv/Scripts/python -m pytest tests/ -v
 ```
 
-128 testes, nenhum gasta API — os agentes LLM são substituídos por dublês e o
+129 testes, nenhum gasta API — os agentes LLM são substituídos por dublês e o
 invariante mede um limpador congelado. Um teste (`tests/test_embeddings.py`)
 exercita o modelo ONNX real e **pula** quando o modelo não está no disco; use
 `pytest -rs` para ver os pulados.

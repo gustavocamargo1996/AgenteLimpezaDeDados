@@ -83,7 +83,7 @@ estruturalmente cego a qualquer mudança de detecção — inclusive a esta.
   **10 pontos, 7 arquivos** — a FD não conhece `detectar(col)` e não é um 11º
   ponto (`git grep -n 'nome_funcao="detectar"' -- "limpeza/"` só acha
   `deteccao/regra.py`).
-- **Suíte de 114 para 128 testes**, todos sem API. Densidade de comentário:
+- **Suíte de 114 para 129 testes**, todos sem API. Densidade de comentário:
   13,2% em 2.671 linhas, e o `CLAUDE.md` passou a publicar um teto de 14%
   (`docs/DECISOES.md#teto-de-densidade-14`), porque `medir_verbosidade.py`
   conta cada docstring de 1 linha (exigida pela própria política) como 3
