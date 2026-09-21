@@ -301,29 +301,9 @@ na moda. O gate de 100% sobre as células rotuladas
 "Gates de 100%") é o que limita o estrago: uma FD que erra qualquer célula
 rotulada nunca chega a marcar nada.
 
-**A via da FD não viaja para o limpador empacotado — lacuna conhecida,
-aceita por ora.** `empacotar.py::_ESTATICO::_mascara` monta a máscara do
-arquivo gerado só a partir de `_DETECTORES` (os `detectar(col)`
-intra-coluna); nada nele reproduz `detectar_dependencia`. Uma coluna cujo
-único caminho de detecção é a FD — `State` no `environment`, medido acima —
-sai do run com F1=1,00 no `deteccao_metricas.json` e, no limpador entregue,
-o mesmo `_mascara` marca **zero** células dela: o `FDS` que o limpador
-carrega vira código morto nesses casos. Fazer a FD viajar de verdade mudaria
-`_ESTATICO`, que é copiado byte a byte para o limpador gerado e termina a
-fixture congelada do invariante — a mesma barreira de custo que descarta o
-contrato geral `detectar(df)` no parágrafo abaixo. Por isso a correção aceita
-aqui é **declarar** a lacuna (no cabeçalho do limpador gerado, no `CLAUDE.md`
-e neste documento), não fechá-la; fechá-la é decisão explícita futura do
-usuário, com nova fixture. Pela mesma raiz, a **camada de correção** também
-diverge entre POC e limpador quando uma FD é reaproveitada: a POC filtra o
-pool da moda pela máscara **combinada** (`cascata.py` passa
-`mascara_completa` a `fd.aplicar_fd`), o limpador só tem a máscara intra
-(`_ESTATICO::_aplicar_fd`). Nas fixtures atuais isso não diverge (medido:
-zero divergências nos 9 grupos de `City` do `environment`), mas o mecanismo
-existe — um grupo pequeno em que a FD marcou o único valor discordante pode
-fazer a moda intra-only escolher o erro onde a moda combinada escolheria o
-valor certo — e o comentário congelado de `_aplicar_fd` que descreve as duas
-máscaras como "equivalente" deixou de ser exato depois deste projeto.
+**A via da FD viaja para o limpador empacotado — a lacuna registrada aqui foi
+fechada.** Ver `docs/DECISOES.md#fd-no-limpador` para o desenho, os dois
+invariantes e o achado do run pago do `environment`.
 
 **Por que NÃO o contrato geral `detectar(df)`:** a seção 8 do `CLAUDE.md`
 antecipa um projeto maior — trocar `detectar(col)` por uma forma cross-column
@@ -345,13 +325,115 @@ correção); `limpeza/pipeline.py::gerar_limpador` (a combinação de máscaras)
 `tests/test_pipeline.py::test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada`
 (a ordem, e que a marca da FD sobrevive até a máscara que a cascata recebe) e
 `tests/test_dependencia.py` (a etapa isolada, e a revalidação do gate da FD
-reaproveitada em `test_cascata_revalida_o_gate_da_fd_reaproveitada`). A
-declaração da lacuna do limpador está em
-`limpeza/empacotar.py::_montar_cabecalho` (o aviso no cabeçalho do arquivo
-gerado — fora de `_ESTATICO`, editável sem regerar a fixture), no `CLAUDE.md`
-("Duas vias de detecção") e no `README.md` ("Duas vias de detecção — e uma
-que não é empacotada"). A medição completa está em
+reaproveitada em `test_cascata_revalida_o_gate_da_fd_reaproveitada`). O
+empacotamento da FD está documentado em `#fd-no-limpador`, no `CLAUDE.md`
+("Duas vias de detecção") e no `README.md` ("Duas vias de detecção"). A
+medição completa está em
 `docs/superpowers/specs/2026-09-20-deteccao-por-dependencia-funcional-design.md`.
+
+<a id="fd-no-limpador"></a>
+## A FD viaja para o limpador gerado
+
+**Decisão:** o arquivo gerado passa a levar **dois** dicionários de FD, não
+um. `DEPENDENCIAS` leva as FDs aprovadas no gate da *detecção* — as mesmas
+que produziram `trabalho.dependencia` no pipeline — e alimenta `_mascara`:
+para cada `coluna: (determinante, dependente)` de `DEPENDENCIAS`,
+`_desvios_da_moda` (novo em `_ESTATICO`) marca quem se desvia da moda
+condicionada do determinante, e a marca entra por OU na máscara que já vinha
+de `_DETECTORES`. `FDS` continua existindo, sem mudança de papel: leva as
+FDs que a cascata usa para *corrigir*, célula marcada por qualquer via. A
+leitura de `_desvios_da_moda` é sempre sobre a máscara **intra**, nunca sobre
+a máscara que está sendo acumulada — a mesma regra de anticircularidade que
+`pipeline.gerar_limpador` já aplicava (`#deteccao-por-fd`) —, e é por isso
+que `_aplicar_fd` (a correção) passa a receber essa máscara combinada: o
+Important 5 da revisão anterior (POC e limpador calculando a moda da correção
+sobre máscaras diferentes) se resolve sem código a mais, porque `aplicar` já
+passava `m` adiante.
+
+**Por quê dois dicionários, não um:** a cascata de correção pode criar uma FD
+só para corrigir uma coluna que o run nunca usou para *marcar* — a proposta
+de FD de correção não passa pelo mesmo gate de detecção, e as duas listas de
+colunas aprovadas não coincidem por construção. Um único dicionário faria o
+limpador detectar com FDs que o run não aprovou para detectar, inflando a
+máscara do artefato além do que a métrica publicada descreve.
+`DEPENDENCIAS` só recebe o que `trabalho.dependencia` guarda — preenchido só
+depois do gate de 100%, ver `#deteccao-por-fd` — então uma coluna com entrada
+em `FDS` mas sem `dependencia` fica fora de `DEPENDENCIAS`.
+
+**A guarda contra as duas cópias divergirem:** a lógica da FD existe duas
+vezes por construção — o limpador é autônomo, não importa nada deste
+repositório —, uma em `deteccao/dependencia.py` (POC) e outra em
+`_ESTATICO::_desvios_da_moda` (limpador). `tests/test_equivalencia.py` gera
+um limpador de verdade com `empacotar.gerar_limpador`, carrega-o do disco e
+compara sua `_mascara(df)` com a máscara que o pipeline da POC produziria
+(`construir_mascara` + `detectar_dependencia`, combinadas do mesmo jeito que
+`pipeline.gerar_limpador` combina), célula por célula, em quatro cenários —
+máscara intra vazia, máscara intra realista, o empate de moda `Bangalore`
+(`KA` vs. `AA`) e FDs encadeadas (`City → State` e `State → Country`, o único
+cenário em que ler `m` em vez de `m_intra` mudaria o resultado). É o teste
+que falha se alguém tocar `_mascara` para ignorar `DEPENDENCIAS` de novo, ou
+trocar `m_intra` por `m` dentro do laço.
+
+**Por que o invariante do `beers` não se moveu.** O run de 20/ago que gerou
+`limpador_beers_congelado.py` é anterior à detecção por FD: não existe
+`trabalho.dependencia` nele, então a fixture ganhou `DEPENDENCIAS = {}` na
+metade de cima e o `_ESTATICO` novo na metade de baixo — nada mais mudou. Os
+sete números continuam **495 / 121 / 121 / 1,0 / 0,2444 / 0,3929 / 71**
+(`tests/test_invariante.py::test_f1_reparo_do_limpador_congelado`). É a prova
+de que o maquinário novo não interfere quando `DEPENDENCIAS` está vazio — as
+duas FDs que `FDS` já carregava (`city`, `state`) continuam só corrigindo,
+como antes.
+
+**O invariante do `environment`, e o que ele prova.** Run pago em 21/set,
+`environment_dirty_300.csv`, todas as 11 colunas, OpenAI `gpt-4o-mini`,
+iterações padrão, congelado em `limpador_environment_congelado.py`. O
+`avaliar_limpador.py` sobre as 300 linhas trava
+**erros=334, mudancas=44, tp=44, precisao=1.0, recall=0.1317, f1=0.2328,
+flags=663** (`test_f1_reparo_do_limpador_environment_congelado`). No gate da
+detecção, o LLM aprovou `City→Country` e `City→Climate_Zone`; reprovou
+`City→State` e `Country→City`. O limpador saiu com
+`DEPENDENCIAS = {Country: City, Climate_Zone: City}` e
+`FDS = {Climate_Zone: City}`. A diferença de base entre o número publicado
+pelo run e o que `avaliar_limpador` mede é a esperada e já documentada em
+`#orcamento-vs-gabarito`: o run mede fora das linhas rotuladas (o holdout),
+`avaliar_limpador` mede a tabela de 300 linhas inteira — nos dois,
+`Monitoring_Station_ID` fica com correção de praticamente 100% e o resto
+perto de 0%, o que é fidelidade ao run, não regressão.
+
+**O achado: a detecção intra super-marcada anula a FD justamente onde ela
+seria necessária.** `State` e `Climate_Zone` são as duas colunas cujo erro é
+inalcançável intra-coluna (`#deteccao-por-fd`: 165/165 e 82/82 no
+`environment` completo) — todo valor sujo também aparece correto em alguma
+outra linha, então a única regra `detectar(col)` que acerta 100% do rotulado
+é marcar **tudo**: o LLM escreveu `^[A-Z]{2}$` para `State` (todo código de
+estado casa) e `Tropical|Temperate` para `Climate_Zone` (todo valor casa).
+Marcar tudo anula a FD por construção: o duplo filtro de
+`moda_condicionada`/`_desvios_da_moda` tira da moda toda linha já marcada, e
+com a máscara intra em 300/300 não sobra nenhuma linha limpa para servir de
+referência — é por isso que `City→State` também reprova no gate, pelo mesmo
+motivo. Medido no run: a FD contribuiu **zero** marcas extras em `State` e em
+`Climate_Zone`; a correção nessas duas colunas é **0%**. O limpador cumpre o
+que prometia — reproduz o run, inclusive esse resultado —, mas no
+`environment`, com LLM real, a via da FD **não contribuiu**: não porque o
+empacotamento falhe, e sim porque a detecção intra super-marca justamente nas
+colunas onde a FD seria necessária. Essa é uma lacuna de desenho conhecida e
+nomeada — a interação entre o gate de 100% intra-coluna e a FD —, candidata a
+próximo projeto; não foi resolvida aqui. Quem prova que o mecanismo da FD no
+limpador funciona quando o gate aprova sem essa interação é o teste de
+equivalência acima e
+`tests/test_empacotar.py::test_limpador_com_fd_injetada_corrige_o_environment`,
+que injeta `DEPENDENCIAS` com as duas colunas e mede o limpador corrigindo
+54/54 erros de `State` e 26/26 de `Climate_Zone`.
+
+**Onde:** `limpeza/empacotar.py::_ESTATICO` (`_mascara`, `_desvios_da_moda`,
+`_aplicar_fd` recebendo a máscara combinada) e
+`limpeza/empacotar.py::gerar_limpador` (coleta de `trabalho.dependencia` em
+`DEPENDENCIAS`); `tests/test_equivalencia.py` (a guarda); `tests/test_empacotar.py::test_dependencias_so_leva_fd_aprovada_na_deteccao` e
+`::test_limpador_com_fd_injetada_corrige_o_environment`;
+`tests/fixtures/limpador_beers_congelado.py` e
+`tests/fixtures/limpador_environment_congelado.py`;
+`tests/test_invariante.py` (os dois invariantes). Spec:
+`docs/superpowers/specs/2026-09-21-fd-no-limpador-design.md`.
 
 <a id="teto-de-densidade-14"></a>
 ## Teto de densidade em 14%

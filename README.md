@@ -44,13 +44,13 @@ CSV sujo + CSV limpo
   → CORREÇÃO em cascata sobre a máscara combinada: regra de código → dependência funcional → flag
        (cada camada com gate de 100% no rotulado; célula intacta escala)
   → tabela corrigida + métricas do run (as duas vias) + cadeias
-  → limpador autônomo empacotado — reproduz SÓ a via intra-coluna (ver abaixo)
+  → limpador autônomo empacotado — as duas vias (ver abaixo)
 ```
 
 Nenhuma célula recebe valor inventado: o que nenhuma camada resolve fica
 sinalizado com o valor sujo original.
 
-### Duas vias de detecção — e uma que não é empacotada
+### Duas vias de detecção
 
 A detecção roda em duas etapas, não uma. A **intra-coluna** vê o valor
 isolado — `detectar(col)` não sabe o resto da linha. A **dependência
@@ -67,16 +67,16 @@ FD passou no gate de 100% sobre o rotulado — o determinante escolhido e a
 justificativa do agente para ele. Coluna sem FD aprovada não ganha essa
 segunda seção; não é omissão, é o gate reprovando.
 
-**A métrica do run e o limpador entregue não medem a mesma coisa.** As
-métricas publicadas (`deteccao_metricas.json`, `cadeias_deteccao.md`) somam
-as duas vias. O limpador autônomo empacotado, não: `empacotar.py` monta a
-máscara do arquivo gerado só com os detectores intra-coluna, porque não
-existe, no artefato, uma reprodução de `detectar_dependencia`. Uma coluna
-detectada só pela FD pode sair do run com P/R/F1 = 100% no relatório e, no
-mesmo run, o limpador empacotado marcar **zero** células dela — é uma
-lacuna conhecida, registrada em `docs/DECISOES.md#deteccao-por-fd`, não um
-efeito colateral silencioso. O cabeçalho de todo limpador gerado avisa isso
-por escrito.
+**As duas vias vão para o limpador empacotado.** O arquivo gerado leva
+`DEPENDENCIAS` (as FDs aprovadas no gate da detecção) além de `_DETECTORES`
+(os `detectar(col)` intra-coluna) e `FDS` (as FDs de correção). `_mascara`,
+no limpador, soma aos detectores intra os desvios da moda condicionada de
+cada FD de `DEPENDENCIAS` — sempre a partir da máscara intra, nunca da que
+está sendo acumulada, para não calcular a moda a partir do próprio
+resultado. `tests/test_equivalencia.py` compara, célula por célula, a
+máscara que a POC produz com a de um limpador gerado de verdade: é o teste
+que garante que as duas cópias da lógica não divergem. Ver
+`docs/DECISOES.md#fd-no-limpador`.
 
 ## Rodando
 
@@ -378,8 +378,8 @@ F1 de reparo. Não faz nenhuma chamada de LLM:
 .venv/Scripts/python -m pytest tests/ -v
 ```
 
-129 testes, nenhum gasta API — os agentes LLM são substituídos por dublês e o
-invariante mede um limpador congelado. Um teste (`tests/test_embeddings.py`)
+139 testes, nenhum gasta API — os agentes LLM são substituídos por dublês e o
+invariante mede dois limpadores congelados, um por dataset. Um teste (`tests/test_embeddings.py`)
 exercita o modelo ONNX real e **pula** quando o modelo não está no disco; use
 `pytest -rs` para ver os pulados.
 

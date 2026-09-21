@@ -209,16 +209,19 @@ erro de digitação). O gate de 100% sobre as células rotuladas
 (`fd.validar_fd`) é a proteção: uma FD que erra qualquer célula rotulada
 nunca chega a marcar nada.
 
-**A via da FD não é empacotada.** `empacotar.py::_ESTATICO::_mascara` monta a
-máscara do limpador autônomo só a partir de `_DETECTORES` (os `detectar(col)`
-intra-coluna); nada no arquivo gerado reproduz `detectar_dependencia`. A
-métrica do run publica as duas vias combinadas — é possível uma coluna sair
-com P/R/F1 = 100% no `deteccao_metricas.json` porque a FD achou tudo, e o
-limpador entregue marcar **zero** células dela, porque essa via nunca viajou
-para o artefato. É exatamente o caso que a seção 1 chama de regressão ("uma
-mudança melhora a tabela de saída mas piora o limpador gerado"), e é uma
-lacuna conhecida, não um comportamento a esconder: ver
-`docs/DECISOES.md#deteccao-por-fd`.
+**A via da FD viaja para o limpador.** O arquivo gerado leva dois dicionários
+— `DEPENDENCIAS` (as FDs que passaram no gate da *detecção*, vindas de
+`trabalho.dependencia`) e `FDS` (as FDs de *correção*, que já existiam). São
+dois porque a cascata pode criar uma FD só para corrigir uma coluna que o run
+nunca usou para marcar; misturar os dois faria o limpador detectar com uma FD
+que o run não aprovou para isso. `_ESTATICO::_mascara` soma, à máscara intra,
+os desvios da moda condicionada de cada entrada de `DEPENDENCIAS`
+(`_desvios_da_moda`, novo) — sempre lendo a máscara **intra**, nunca a que
+está sendo acumulada, a mesma regra de anticircularidade do pipeline.
+`tests/test_equivalencia.py` compara, célula por célula, a máscara que a POC
+produz com a de um limpador gerado de verdade e carregado do disco: é o teste
+que impede as duas cópias da lógica — a da POC e a de `_ESTATICO` — de
+divergirem. Ver `docs/DECISOES.md#fd-no-limpador`.
 
 ---
 
@@ -356,9 +359,10 @@ papéis não salvam um run cuja detecção não passou no portão.
 
 ## 6. Invariante de aceitação
 
-`tests/test_invariante.py` aplica o limpador **congelado** de
-`tests/fixtures/limpador_beers_congelado.py` às 300 linhas de
-`beers_dirty_300.csv` e trava o resultado:
+São **duas** fixtures e dois invariantes, um por dataset, ambos em
+`tests/test_invariante.py`.
+
+`limpador_beers_congelado.py`, aplicado às 300 linhas de `beers_dirty_300.csv`:
 
 | Métrica | Valor travado |
 |---|---|
@@ -369,6 +373,19 @@ papéis não salvam um run cuja detecção não passou no portão.
 | `recall` | 0.2444 |
 | `f1` | 0.3929 |
 | `flags` | 71 |
+
+`limpador_environment_congelado.py`, aplicado às 300 linhas de
+`environment_dirty_300.csv`:
+
+| Métrica | Valor travado |
+|---|---|
+| `erros` | 334 |
+| `mudancas` | 44 |
+| `tp` | 44 |
+| `precisao` | 1.0 |
+| `recall` | 0.1317 |
+| `f1` | 0.2328 |
+| `flags` | 663 |
 
 ```bash
 .venv/Scripts/python -m pytest tests/test_invariante.py -v
@@ -384,11 +401,19 @@ papéis não salvam um run cuja detecção não passou no portão.
 > entrada nova em `docs/DECISOES.md` e de uma fixture nova. Nunca de um
 > `assert` reescrito para bater com o que saiu.
 
-`tests/test_estatico_congelado.py` guarda a outra ponta: a constante
-`_ESTATICO` de `limpeza/empacotar.py` tem de continuar batendo byte a byte com
-o final da fixture. Se ela divergir, o limpador que a POC gera hoje deixou de
-ser o mesmo que o invariante mede — e o número acima passa a mentir sobre o
-run.
+`tests/test_estatico_congelado.py` guarda a outra ponta, para **as duas**
+fixtures: a constante `_ESTATICO` de `limpeza/empacotar.py` tem de continuar
+batendo byte a byte com o final de cada uma. Se ela divergir, o limpador que
+a POC gera hoje deixou de ser o mesmo que o invariante mede — e os números
+acima passam a mentir sobre o run.
+
+O invariante do `environment` prova que **o limpador reproduz o run**, não que
+a FD contribuiu nele: o LLM reprovou `City→State` no gate e as regras
+intra-coluna de `State`/`Climate_Zone` marcam todas as 300 células, o que
+anula a FD por construção (ver `docs/DECISOES.md#fd-no-limpador`). Quem prova
+o mecanismo da FD no limpador — que ela detecta e corrige quando o gate
+aprova — é `tests/test_equivalencia.py` e
+`tests/test_empacotar.py::test_limpador_com_fd_injetada_corrige_o_environment`.
 
 ---
 
@@ -402,7 +427,7 @@ run.
 - **Não** comentar: histórico ("antes isso era..."), medição ("reduz 40% do
   tempo"), comparação com o ZeroDC, plano de IA ("aqui poderíamos...").
   Comentário descreve a mecânica do que está ali, ou não existe.
-- Densidade atual: **13,2%** em 2.671 linhas, teto **14%** (ver
+- Densidade atual: **13,0%** em 2.699 linhas, teto **14%** (ver
   `docs/DECISOES.md#teto-de-densidade-14`). `tests/medir_verbosidade.py`
   mede; use antes de commitar uma tarefa que mexe em muitos arquivos.
 
@@ -432,7 +457,10 @@ não.
 
 ### Loops
 
-São **47** (incluindo `avaliar_limpador.py` e `escolher_modelo.py`). Colapse loops **paralelos** —
+São **50** (incluindo `avaliar_limpador.py` e `escolher_modelo.py`) — três a mais
+que antes de `fd-no-limpador`: `_mascara` e `_desvios_da_moda`, novos em
+`_ESTATICO`, mais o `for` que `gerar_limpador` usa para coletar
+`trabalho.dependencia` em `DEPENDENCIAS`. Colapse loops **paralelos** —
 dois `for` sobre a mesma sequência viram um. Mantenha os que **carregam
 estado** entre iterações: o escalonamento célula a célula da cascata
 (`pendentes`/`restantes`) e o loop de refino são estado acumulado, e fundi-los
@@ -502,12 +530,16 @@ uma decisão de segurança, não uma conveniência de implementação. Leia
 `docs/DECISOES.md#portao-ast` e `#modo-serie` antes.
 
 **`limpeza/empacotar.py::_ESTATICO`** — é copiada **byte a byte** para o
-limpador gerado, e a fixture congelada
-`tests/fixtures/limpador_beers_congelado.py` termina exatamente com ela.
-`tests/test_estatico_congelado.py` trava isso. Se você editar `_ESTATICO`, o
-teste quebra — e a resposta certa quase nunca é atualizar a fixture, porque a
-fixture é o que `test_invariante.py` mede. Divergir de `_ESTATICO` faz o
-limpador mentir sobre o run.
+limpador gerado, e **as duas** fixtures congeladas —
+`tests/fixtures/limpador_beers_congelado.py` e
+`tests/fixtures/limpador_environment_congelado.py` — terminam exatamente com
+ela. `tests/test_estatico_congelado.py` trava isso para as duas.
+Se você editar `_ESTATICO`, o teste quebra — e a resposta certa quase nunca é
+atualizar a fixture, porque a fixture é o que `test_invariante.py` mede.
+Quando for mesmo o caso, atualize **as duas**, e só na metade de baixo (a
+metade de cima — `DEPENDENCIAS`, `FDS`, `_DETECTORES`, `_CORRETORES` — é
+específica de cada run e não muda). Divergir de `_ESTATICO` faz o limpador
+mentir sobre o run.
 
 **Sobre o teste de embeddings:** `tests/test_embeddings.py` exercita o modelo
 MiniLM ONNX **real** e usa `pytest.mark.skipif` quando o modelo não está no

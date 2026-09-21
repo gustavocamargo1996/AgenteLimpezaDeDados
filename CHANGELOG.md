@@ -9,16 +9,56 @@ função, não commit.
 
 ## [Não publicado]
 
-Três frentes desde o último marco: **detecção por dependência funcional**
-(20/set/2026), **provedor local e container** (19/set/2026) e a
-**simplificação do gerador** (30/ago/2026). O invariante de
-`tests/test_invariante.py` (495 erros, 121 mudanças, 121 TP, precisão 1,0,
-recall 0,2444, F1 0,3929, 71 flags no `beers` de 300 linhas) é o mesmo nas
-três — mas não porque a FD fique inerte no `beers`: com a máscara intra real
-ela chega a marcar 9 células (8 TP, 1 FP) quando o agente escolhe
-`brewery-name` como determinante, ver abaixo. `test_invariante.py` aplica o
-**limpador congelado** da fixture, nunca o pipeline vivo, e por isso é
-estruturalmente cego a qualquer mudança de detecção — inclusive a esta.
+Quatro frentes desde o último marco: **FD no limpador gerado** (21/set/2026),
+**detecção por dependência funcional** (20/set/2026), **provedor local e
+container** (19/set/2026) e a **simplificação do gerador** (30/ago/2026). O
+invariante do `beers` em `tests/test_invariante.py` (495 erros, 121 mudanças,
+121 TP, precisão 1,0, recall 0,2444, F1 0,3929, 71 flags nas 300 linhas) é o
+mesmo desde a segunda frente — mas não porque a FD fique inerte no `beers`:
+com a máscara intra real ela chega a marcar 9 células (8 TP, 1 FP) quando o
+agente escolhe `brewery-name` como determinante, ver abaixo.
+`test_invariante.py` aplica o **limpador congelado** da fixture, nunca o
+pipeline vivo, e por isso é estruturalmente cego a qualquer mudança de
+detecção — inclusive a esta.
+
+### Adicionado — FD no limpador gerado (21/set/2026)
+
+- **O limpador autônomo passa a levar a detecção por FD, não só a
+  correção.** O arquivo gerado ganhou `DEPENDENCIAS` (as FDs aprovadas no
+  gate da *detecção*, vindas de `trabalho.dependencia`) ao lado de `FDS`, que
+  já existia e continua só corrigindo — são dois dicionários porque a cascata
+  pode criar uma FD só para corrigir uma coluna que o run nunca usou para
+  marcar. `_ESTATICO::_mascara` soma, à máscara intra, os desvios da moda
+  condicionada de cada FD de `DEPENDENCIAS` (`_desvios_da_moda`, novo),
+  sempre lendo a máscara intra, nunca a que está sendo acumulada — a mesma
+  anticircularidade da POC. Como efeito colateral sem código a mais, a moda
+  da *correção* no limpador passou a usar essa mesma máscara combinada,
+  fechando a divergência que a revisão anterior apontava entre POC e
+  limpador (o "Important 5"). O aviso de lacuna que o cabeçalho do limpador
+  gerado trazia saiu, porque deixou de ser verdade.
+- **`tests/test_equivalencia.py`**, novo: gera um limpador de verdade,
+  carrega-o do disco e compara sua máscara com a da POC, célula por célula,
+  em quatro cenários (intra vazia, intra realista, empate de moda, FDs
+  encadeadas) — a guarda contra as duas cópias da lógica divergirem.
+- **Dois invariantes agora, um por dataset.** O do `beers` não se move (o run
+  de 20/ago não tem FD de detecção, `DEPENDENCIAS = {}`, e a fixture mudou só
+  na metade de baixo). O `environment` ganhou fixture e invariante próprios,
+  de um run pago em 21/set (`erros=334, mudancas=44, tp=44, precisao=1.0,
+  recall=0.1317, f1=0.2328, flags=663`). `test_estatico_congelado.py` agora
+  vale para as duas fixtures.
+- **O achado do run pago: a FD não contribuiu no `environment`.** O LLM
+  reprovou `City→State` no gate e aprovou `City→Climate_Zone`, mas as regras
+  intra-coluna que ele escreveu para `State` e `Climate_Zone` marcam **todas
+  as 300 células** — o único jeito de acertar 100% do rotulado quando todo
+  erro é inalcançável intra-coluna. Marcar tudo tira da moda condicionada
+  toda linha limpa e anula a FD por construção: contribuição medida de
+  **zero** marcas extras nas duas colunas, correção **0%** nelas. O limpador
+  reproduz o run fielmente — inclusive esse resultado —, mas a lacuna real
+  não é o empacotamento: é a interação entre o gate de 100% intra-coluna e a
+  FD, uma lacuna de desenho conhecida e nomeada, não resolvida aqui. Ver
+  `docs/DECISOES.md#fd-no-limpador`.
+- **Suíte de 129 para 139 testes**, todos sem API. Densidade de comentário:
+  13,0% em 2.699 linhas, dentro do teto de 14%.
 
 ### Adicionado — detecção por dependência funcional (20/set/2026)
 
@@ -52,22 +92,10 @@ estruturalmente cego a qualquer mudança de detecção — inclusive a esta.
   linha da `Blackrocks Brewery`, `MA` correto contra seis linhas `MI` da
   mesma cervejaria: heterogeneidade real do dado). O gate de 100% é a
   proteção contra esse tipo de erro se propagar.
-- **A via da FD não viaja para o limpador empacotado — lacuna conhecida,
-  declarada, não escondida.** `empacotar.py::_ESTATICO::_mascara` só conhece
-  os detectores intra-coluna; uma coluna detectada só pela FD (`State` no
-  `environment`) pode sair do run com F1=1,00 publicado e o limpador entregue
-  marcar **zero** células dela — o `FDS` empacotado vira código morto nesses
-  casos. Fechar isso mudaria `_ESTATICO` e obrigaria a regerar a fixture
-  congelada do invariante, então a correção desta rodada foi declarar a
-  lacuna: aviso no cabeçalho de todo limpador gerado
-  (`empacotar.py::_montar_cabecalho`, fora de `_ESTATICO`), seção no
-  `CLAUDE.md`, subseção no `README.md` e registro em
-  `docs/DECISOES.md#deteccao-por-fd`. Pela mesma raiz, a camada de correção
-  também passou a divergir entre POC e limpador quando uma FD é reaproveitada
-  (a POC filtra a moda pela máscara combinada, o limpador só tem a intra); nas
-  fixtures atuais não muda o resultado, mas o comentário congelado de
-  `_aplicar_fd` que chamava as duas máscaras de "equivalente" deixou de ser
-  exato.
+- **Nesta rodada, a via da FD ainda não empacotava** — lacuna declarada no
+  cabeçalho do limpador gerado, no `CLAUDE.md` e no `README.md`. Fechada na
+  frente "FD no limpador gerado" (21/set/2026, acima):
+  `docs/DECISOES.md#fd-no-limpador`.
 - **Novo teste trava que a marca da FD sobrevive até a cascata**
   (`tests/test_pipeline.py::test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada`,
   ampliado) **e que o gate da FD reaproveitada é revalidado, não só
