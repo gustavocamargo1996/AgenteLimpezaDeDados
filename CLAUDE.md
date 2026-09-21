@@ -209,6 +209,17 @@ erro de digitação). O gate de 100% sobre as células rotuladas
 (`fd.validar_fd`) é a proteção: uma FD que erra qualquer célula rotulada
 nunca chega a marcar nada.
 
+**A via da FD não é empacotada.** `empacotar.py::_ESTATICO::_mascara` monta a
+máscara do limpador autônomo só a partir de `_DETECTORES` (os `detectar(col)`
+intra-coluna); nada no arquivo gerado reproduz `detectar_dependencia`. A
+métrica do run publica as duas vias combinadas — é possível uma coluna sair
+com P/R/F1 = 100% no `deteccao_metricas.json` porque a FD achou tudo, e o
+limpador entregue marcar **zero** células dela, porque essa via nunca viajou
+para o artefato. É exatamente o caso que a seção 1 chama de regressão ("uma
+mudança melhora a tabela de saída mas piora o limpador gerado"), e é uma
+lacuna conhecida, não um comportamento a esconder: ver
+`docs/DECISOES.md#deteccao-por-fd`.
+
 ---
 
 ## 4. Os tipos
@@ -391,7 +402,7 @@ run.
 - **Não** comentar: histórico ("antes isso era..."), medição ("reduz 40% do
   tempo"), comparação com o ZeroDC, plano de IA ("aqui poderíamos...").
   Comentário descreve a mecânica do que está ali, ou não existe.
-- Densidade atual: **13,1%** em 2.656 linhas, teto **14%** (ver
+- Densidade atual: **13,2%** em 2.671 linhas, teto **14%** (ver
   `docs/DECISOES.md#teto-de-densidade-14`). `tests/medir_verbosidade.py`
   mede; use antes de commitar uma tarefa que mexe em muitos arquivos.
 

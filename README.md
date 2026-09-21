@@ -40,16 +40,17 @@ CSV sujo + CSV limpo
   → representantes (o mais atípico e o mais típico de cada grupo) + rótulos
   → DETECÇÃO intra-coluna: agente escreve detectar(col), refinada por N iterações com oráculo
   → DETECÇÃO por dependência funcional: sobre a máscara intra, marca desvio da moda condicionada
-  → máscara 0/1 do dataset (as duas vias combinadas)
-  → CORREÇÃO em cascata: regra de código → dependência funcional → flag
+  → máscara combinada (as duas vias) do dataset
+  → CORREÇÃO em cascata sobre a máscara combinada: regra de código → dependência funcional → flag
        (cada camada com gate de 100% no rotulado; célula intacta escala)
-  → limpador autônomo empacotado + métricas + cadeias
+  → tabela corrigida + métricas do run (as duas vias) + cadeias
+  → limpador autônomo empacotado — reproduz SÓ a via intra-coluna (ver abaixo)
 ```
 
 Nenhuma célula recebe valor inventado: o que nenhuma camada resolve fica
 sinalizado com o valor sujo original.
 
-### Duas vias de detecção
+### Duas vias de detecção — e uma que não é empacotada
 
 A detecção roda em duas etapas, não uma. A **intra-coluna** vê o valor
 isolado — `detectar(col)` não sabe o resto da linha. A **dependência
@@ -65,6 +66,17 @@ justificativas: a cadeia de pensamento da regra intra-coluna e — só quando a
 FD passou no gate de 100% sobre o rotulado — o determinante escolhido e a
 justificativa do agente para ele. Coluna sem FD aprovada não ganha essa
 segunda seção; não é omissão, é o gate reprovando.
+
+**A métrica do run e o limpador entregue não medem a mesma coisa.** As
+métricas publicadas (`deteccao_metricas.json`, `cadeias_deteccao.md`) somam
+as duas vias. O limpador autônomo empacotado, não: `empacotar.py` monta a
+máscara do arquivo gerado só com os detectores intra-coluna, porque não
+existe, no artefato, uma reprodução de `detectar_dependencia`. Uma coluna
+detectada só pela FD pode sair do run com P/R/F1 = 100% no relatório e, no
+mesmo run, o limpador empacotado marcar **zero** células dela — é uma
+lacuna conhecida, registrada em `docs/DECISOES.md#deteccao-por-fd`, não um
+efeito colateral silencioso. O cabeçalho de todo limpador gerado avisa isso
+por escrito.
 
 ## Rodando
 
@@ -366,7 +378,7 @@ F1 de reparo. Não faz nenhuma chamada de LLM:
 .venv/Scripts/python -m pytest tests/ -v
 ```
 
-127 testes, nenhum gasta API — os agentes LLM são substituídos por dublês e o
+128 testes, nenhum gasta API — os agentes LLM são substituídos por dublês e o
 invariante mede um limpador congelado. Um teste (`tests/test_embeddings.py`)
 exercita o modelo ONNX real e **pula** quando o modelo não está no disco; use
 `pytest -rs` para ver os pulados.

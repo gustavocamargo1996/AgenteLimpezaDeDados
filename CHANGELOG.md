@@ -14,9 +14,11 @@ Três frentes desde o último marco: **detecção por dependência funcional**
 **simplificação do gerador** (30/ago/2026). O invariante de
 `tests/test_invariante.py` (495 erros, 121 mudanças, 121 TP, precisão 1,0,
 recall 0,2444, F1 0,3929, 71 flags no `beers` de 300 linhas) é o mesmo nas
-três: nenhuma delas moveu um número publicado — o `beers` tem 0% de erro
-cross-column inalcançável intra-coluna, então a FD nova não tem nada para
-marcar nele fora do que a máscara intra já cobria.
+três — mas não porque a FD fique inerte no `beers`: com a máscara intra real
+ela chega a marcar 9 células (8 TP, 1 FP) quando o agente escolhe
+`brewery-name` como determinante, ver abaixo. `test_invariante.py` aplica o
+**limpador congelado** da fixture, nunca o pipeline vivo, e por isso é
+estruturalmente cego a qualquer mudança de detecção — inclusive a esta.
 
 ### Adicionado — detecção por dependência funcional (20/set/2026)
 
@@ -36,8 +38,9 @@ marcar nele fora do que a máscara intra já cobria.
   errado em outras — só o contexto da linha separa os dois casos. No `beers`
   são **0%**; no `environment` são **21,5%** (247/1.147), concentrados por
   inteiro em `State` (**165 de 165**) e `Climate_Zone` (**82 de 82**). A moda
-  condicionada, medida no `environment` completo, fecha essa lacuna com
-  **F1=1,00** nas duas colunas, zero falso positivo. Ver
+  condicionada, medida no `environment` completo, fecha essa lacuna **na
+  detecção da POC** com **F1=1,00** nas duas colunas, zero falso positivo —
+  é a métrica do run, não do limpador entregue (ver o item abaixo). Ver
   `docs/DECISOES.md#deteccao-por-fd`.
 - **`Trabalho.dependencia`** guarda a FD aprovada (`determinante`,
   `dependente`, `justificativa`) só quando ela passa o gate de 100% sobre o
@@ -49,6 +52,29 @@ marcar nele fora do que a máscara intra já cobria.
   linha da `Blackrocks Brewery`, `MA` correto contra seis linhas `MI` da
   mesma cervejaria: heterogeneidade real do dado). O gate de 100% é a
   proteção contra esse tipo de erro se propagar.
+- **A via da FD não viaja para o limpador empacotado — lacuna conhecida,
+  declarada, não escondida.** `empacotar.py::_ESTATICO::_mascara` só conhece
+  os detectores intra-coluna; uma coluna detectada só pela FD (`State` no
+  `environment`) pode sair do run com F1=1,00 publicado e o limpador entregue
+  marcar **zero** células dela — o `FDS` empacotado vira código morto nesses
+  casos. Fechar isso mudaria `_ESTATICO` e obrigaria a regerar a fixture
+  congelada do invariante, então a correção desta rodada foi declarar a
+  lacuna: aviso no cabeçalho de todo limpador gerado
+  (`empacotar.py::_montar_cabecalho`, fora de `_ESTATICO`), seção no
+  `CLAUDE.md`, subseção no `README.md` e registro em
+  `docs/DECISOES.md#deteccao-por-fd`. Pela mesma raiz, a camada de correção
+  também passou a divergir entre POC e limpador quando uma FD é reaproveitada
+  (a POC filtra a moda pela máscara combinada, o limpador só tem a intra); nas
+  fixtures atuais não muda o resultado, mas o comentário congelado de
+  `_aplicar_fd` que chamava as duas máscaras de "equivalente" deixou de ser
+  exato.
+- **Novo teste trava que a marca da FD sobrevive até a cascata**
+  (`tests/test_pipeline.py::test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada`,
+  ampliado) **e que o gate da FD reaproveitada é revalidado, não só
+  assumido** (`tests/test_dependencia.py::test_cascata_revalida_o_gate_da_fd_reaproveitada`,
+  novo) — as duas lacunas de cobertura que uma revisão por mutação encontrou:
+  sem esses testes, apagar `+ mascara_fd` do pipeline ou trocar a revalidação
+  do gate por `True` deixava a suíte inteira verde.
 - **O contrato geral de detecção cross-column (`detectar(df)`) foi avaliado e
   descartado por ora**: nenhum dos cinco datasets disponíveis tem erro
   cross-column que não seja violação de FD, e a rota geral mudaria
@@ -57,12 +83,12 @@ marcar nele fora do que a máscara intra já cobria.
   **10 pontos, 7 arquivos** — a FD não conhece `detectar(col)` e não é um 11º
   ponto (`git grep -n 'nome_funcao="detectar"' -- "limpeza/"` só acha
   `deteccao/regra.py`).
-- **Suíte de 114 para 127 testes**, todos sem API. Densidade de comentário:
-  13,1% em 2.656 linhas, e o `CLAUDE.md` passou a publicar um teto de 14%
+- **Suíte de 114 para 128 testes**, todos sem API. Densidade de comentário:
+  13,2% em 2.671 linhas, e o `CLAUDE.md` passou a publicar um teto de 14%
   (`docs/DECISOES.md#teto-de-densidade-14`), porque `medir_verbosidade.py`
   conta cada docstring de 1 linha (exigida pela própria política) como 3
   linhas de "comentário", e um módulo pequeno bem documentado já nasce
-  com piso alto por isso (`deteccao/dependencia.py`: 50 linhas, 26,0%).
+  com piso alto por isso (`deteccao/dependencia.py`: 53 linhas, 28,3%).
 - **Documentação**: seção nova no `CLAUDE.md` ("Duas vias de detecção"),
   entrada nova no `docs/DECISOES.md` (`#deteccao-por-fd`,
   `#teto-de-densidade-14`) e subseção nova no `README.md`.

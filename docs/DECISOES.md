@@ -285,8 +285,10 @@ colunas é estruturalmente invisível para qualquer regra `detectar(col)`. A
 forma do erro é sempre a mesma — `State='MH'` numa linha cuja `City` é
 `'Bangalore'` — uma violação de dependência funcional, não um valor
 inválido. Detecção por desvio da moda condicionada, medida no `environment`
-completo, fecha a lacuna com **F1=1,00** nas duas colunas (`City -> State`:
-165 TP, 0 FP, 0 FN; `City -> Climate_Zone`: 82 TP, 0 FP, 0 FN).
+completo, fecha a lacuna **na detecção da POC** com **F1=1,00** nas duas
+colunas (`City -> State`: 165 TP, 0 FP, 0 FN; `City -> Climate_Zone`: 82 TP,
+0 FP, 0 FN) — é a métrica do run, não do limpador entregue; ver o próximo
+parágrafo.
 
 **A moda condicionada não é infalível — e não deve ser lida como tal.** No
 `beers`, com a máscara intra realista (não o cenário teórico acima), a FD de
@@ -298,6 +300,30 @@ na moda. O gate de 100% sobre as células rotuladas
 (`correcao/fd.py::validar_fd`, mesmo gate que já existia para a correção — ver
 "Gates de 100%") é o que limita o estrago: uma FD que erra qualquer célula
 rotulada nunca chega a marcar nada.
+
+**A via da FD não viaja para o limpador empacotado — lacuna conhecida,
+aceita por ora.** `empacotar.py::_ESTATICO::_mascara` monta a máscara do
+arquivo gerado só a partir de `_DETECTORES` (os `detectar(col)`
+intra-coluna); nada nele reproduz `detectar_dependencia`. Uma coluna cujo
+único caminho de detecção é a FD — `State` no `environment`, medido acima —
+sai do run com F1=1,00 no `deteccao_metricas.json` e, no limpador entregue,
+o mesmo `_mascara` marca **zero** células dela: o `FDS` que o limpador
+carrega vira código morto nesses casos. Fazer a FD viajar de verdade mudaria
+`_ESTATICO`, que é copiado byte a byte para o limpador gerado e termina a
+fixture congelada do invariante — a mesma barreira de custo que descarta o
+contrato geral `detectar(df)` no parágrafo abaixo. Por isso a correção aceita
+aqui é **declarar** a lacuna (no cabeçalho do limpador gerado, no `CLAUDE.md`
+e neste documento), não fechá-la; fechá-la é decisão explícita futura do
+usuário, com nova fixture. Pela mesma raiz, a **camada de correção** também
+diverge entre POC e limpador quando uma FD é reaproveitada: a POC filtra o
+pool da moda pela máscara **combinada** (`cascata.py` passa
+`mascara_completa` a `fd.aplicar_fd`), o limpador só tem a máscara intra
+(`_ESTATICO::_aplicar_fd`). Nas fixtures atuais isso não diverge (medido:
+zero divergências nos 9 grupos de `City` do `environment`), mas o mecanismo
+existe — um grupo pequeno em que a FD marcou o único valor discordante pode
+fazer a moda intra-only escolher o erro onde a moda combinada escolheria o
+valor certo — e o comentário congelado de `_aplicar_fd` que descreve as duas
+máscaras como "equivalente" deixou de ser exato depois deste projeto.
 
 **Por que NÃO o contrato geral `detectar(df)`:** a seção 8 do `CLAUDE.md`
 antecipa um projeto maior — trocar `detectar(col)` por uma forma cross-column
@@ -317,8 +343,14 @@ justamente durante a mudança que ela deveria proteger.
 `moda_condicionada`, `validar_fd` — mecânica compartilhada com a camada de
 correção); `limpeza/pipeline.py::gerar_limpador` (a combinação de máscaras);
 `tests/test_pipeline.py::test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada`
-(a ordem) e `tests/test_dependencia.py` (a etapa isolada). A medição completa
-está em
+(a ordem, e que a marca da FD sobrevive até a máscara que a cascata recebe) e
+`tests/test_dependencia.py` (a etapa isolada, e a revalidação do gate da FD
+reaproveitada em `test_cascata_revalida_o_gate_da_fd_reaproveitada`). A
+declaração da lacuna do limpador está em
+`limpeza/empacotar.py::_montar_cabecalho` (o aviso no cabeçalho do arquivo
+gerado — fora de `_ESTATICO`, editável sem regerar a fixture), no `CLAUDE.md`
+("Duas vias de detecção") e no `README.md` ("Duas vias de detecção — e uma
+que não é empacotada"). A medição completa está em
 `docs/superpowers/specs/2026-09-20-deteccao-por-dependencia-funcional-design.md`.
 
 <a id="teto-de-densidade-14"></a>
@@ -327,16 +359,18 @@ está em
 **Decisão:** o `CLAUDE.md` §7 passa a publicar um teto explícito de densidade
 de comentário, em **14%**. Antes ele só registrava a densidade medida, sem
 teto; os 13% existiam como meta interna do plano de execução deste projeto, e
-foram revistos para 14% durante ele. A densidade ao final é 13,1% em 2.656
-linhas.
+foram revistos para 14% durante ele. A densidade ao final da rodada de
+documentação é 13,1% em 2.656 linhas; depois da rodada de correção que se
+seguiu (mais comentários, mais um teste), 13,2% em 2.671 — o teto de 14%
+segue com folga.
 
 **Por quê:** `tests/medir_verbosidade.py` conta cada docstring como
 `len(docstring.splitlines()) + 2` linhas de "comentário", e a própria política
 de comentários deste projeto **exige** docstring de 1 linha em todo módulo,
 classe e função. Um módulo pequeno e bem documentado já nasce com piso alto
-só por cumprir a política: `limpeza/deteccao/dependencia.py`, com 50 linhas e
-quatro docstrings de 1 linha (módulo + 3 funções) e nenhum comentário inline
-gordo, mede **26,0%** — mais que o dobro do teto antigo, sem um único
+só por cumprir a política: `limpeza/deteccao/dependencia.py`, com 53 linhas e
+quatro docstrings de 1 linha (módulo + 3 funções) mais um comentário inline
+de mecânica, mede **28,3%** — mais que o dobro do teto antigo, sem um único
 parágrafo de prosa fora de lugar. Um projeto que manda documentar toda função
 tem um piso imposto pelo próprio instrumento de medida. Trocar o instrumento
 no meio do plano apagaria a comparabilidade com a medição anterior; subir o
