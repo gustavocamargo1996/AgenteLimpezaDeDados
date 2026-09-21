@@ -36,6 +36,7 @@ def rodar_coluna(
     rotulados: dict,
     mascara_completa,
     agentes: dict,
+    dependencia=None,
     mi_threshold: float | None = None,
 ) -> tuple[dict, dict]:
     """Roda a cascata numa coluna e devolve (correcoes_por_indice, trilha diagnostica)."""
@@ -69,11 +70,14 @@ def rodar_coluna(
                 restantes.append(idx)  # intacta escala
         pendentes = restantes
 
-    fd = None
+    fd = dependencia  # ja proposta e aprovada na deteccao; nao propor de novo aqui
     gate_fd = None
-    candidatos = fd_mod.candidatos_determinantes(df, coluna, limiar=mi_threshold)
-    if pendentes and candidatos:
-        fd = fd_mod.propor_fd(coluna, rows, candidatos, df, agente=agentes.get("fd"))
+    if fd is None and pendentes:
+        candidatos = fd_mod.candidatos_determinantes(df, coluna, limiar=mi_threshold)
+        if candidatos:
+            fd = fd_mod.propor_fd(coluna, rows, candidatos, df, agente=agentes.get("fd"))
+    if fd is not None and pendentes:
+        # Revalida mesmo a FD ja aprovada: a mascara aqui e' a combinada, com informacao nova.
         gate_fd = fd_mod.validar_fd(fd, rows, df, mascara_completa, coluna)
         if gate_fd:
             mudancas = fd_mod.aplicar_fd(fd, df, pendentes, mascara_completa, coluna)
@@ -120,6 +124,7 @@ def rodar_cascata(trabalhos: list, tabela, mascara, agentes: dict):
                 rotulados=_rotulados(trabalho),
                 mascara_completa=mascara,
                 agentes=agentes,
+                dependencia=trabalho.dependencia,
                 mi_threshold=config.MI_THRESHOLD,
             )
         except Exception as exc:  # noqa: BLE001 -- 1 coluna ruim nao derruba o run

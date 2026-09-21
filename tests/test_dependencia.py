@@ -1,4 +1,5 @@
 """A deteccao por dependencia funcional, com agente duble (sem rede)."""
+import types
 from pathlib import Path
 
 import pandas as pd
@@ -159,3 +160,30 @@ def test_excecao_numa_coluna_nao_derruba_as_outras():
                                          _AgenteQueFalhaUmaVez())
     assert int(m["State"].sum()) == 0, "a coluna que falhou nao marca"
     assert int(m["Climate_Zone"].sum()) == 26, "a seguinte segue normalmente"
+
+
+def test_cascata_reaproveita_a_fd_em_vez_de_propor(monkeypatch):
+    """A FD que marcou e' a que corrige; propor de novo poderia discordar."""
+    from limpeza.correcao import cascata, fd as fd_real
+
+    chamou = []
+    monkeypatch.setattr(fd_real, "propor_fd",
+                        lambda *a, **k: chamou.append(a) or DependenciaFuncional(
+                            determinante="OUTRA", dependente="State", justificativa="x"))
+    monkeypatch.setattr(cascata, "_camada_codigo",
+                        lambda coluna, rotulados, agentes: (
+                            types.SimpleNamespace(
+                                transformacao=types.SimpleNamespace(tipo="nenhuma"),
+                                descricao_padrao="fake: sem codigo"),
+                            None, ""))
+
+    tabela = _tabela_environment(["State"])
+    trabalhos = _trabalhos(tabela)
+    trabalhos[0].dependencia = DependenciaFuncional(
+        determinante="City", dependente="State", justificativa="ja proposta na deteccao")
+    mascara = _mascara_zerada(tabela)
+    mascara.loc[1, "State"] = 1  # uma celula marcada, para a cascata ter o que fazer
+
+    cascata.rodar_cascata(trabalhos, tabela, mascara,
+                          {"especificador": None, "codigo": None, "fd": None})
+    assert chamou == [], "a cascata propos FD de novo em vez de reaproveitar"
