@@ -58,7 +58,7 @@ marcar nele fora do que a máscara intra já cobria.
   ponto (`git grep -n 'nome_funcao="detectar"' -- "limpeza/"` só acha
   `deteccao/regra.py`).
 - **Suíte de 114 para 127 testes**, todos sem API. Densidade de comentário:
-  13,1% em 2.656 linhas — o teto subiu de 13% para 14%
+  13,1% em 2.656 linhas, e o `CLAUDE.md` passou a publicar um teto de 14%
   (`docs/DECISOES.md#teto-de-densidade-14`), porque `medir_verbosidade.py`
   conta cada docstring de 1 linha (exigida pela própria política) como 3
   linhas de "comentário", e um módulo pequeno bem documentado já nasce

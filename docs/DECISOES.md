@@ -324,9 +324,11 @@ está em
 <a id="teto-de-densidade-14"></a>
 ## Teto de densidade em 14%
 
-**Decisão:** o teto de densidade de comentário do `CLAUDE.md` §7 sobe de 13%
-para **14%**. A densidade medida ao final da Task 6 é 13,1% em 2.656 linhas —
-dentro do teto novo, fora do antigo.
+**Decisão:** o `CLAUDE.md` §7 passa a publicar um teto explícito de densidade
+de comentário, em **14%**. Antes ele só registrava a densidade medida, sem
+teto; os 13% existiam como meta interna do plano de execução deste projeto, e
+foram revistos para 14% durante ele. A densidade ao final é 13,1% em 2.656
+linhas.
 
 **Por quê:** `tests/medir_verbosidade.py` conta cada docstring como
 `len(docstring.splitlines()) + 2` linhas de "comentário", e a própria política

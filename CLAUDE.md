@@ -123,8 +123,8 @@ limpeza/
     oraculo.py                escolhe o que rotular na próxima iteração
     refino.py                 loop de active learning que melhora a regra
     mascara.py                aplica detectar(col) por coluna → DataFrame[bool]
-    dependencia.py             etapa 3b — FD sobre a máscara intra: marca quem
-                               desvia da moda condicionada do grupo
+    dependencia.py            etapa 3b — FD sobre a máscara intra: marca quem
+                              desvia da moda condicionada do grupo
   correcao/                 etapa 4 — como consertar
     cascata.py                código → FD → flag, com gate de 100% em cada camada
     regras.py                 agente especificador + agente tradutor (JSON → Python)
