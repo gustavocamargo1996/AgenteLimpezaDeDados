@@ -139,3 +139,38 @@ def test_determinante_sem_detector_mascara_tudo_false_fd_aplica():
     assert "brewery" not in mod._DETECTORES
     assert list(corrigido["state"]) == ["CA", "CA", "NY", "NY"]
     assert not flags["state"].any()
+
+
+def test_dependencias_so_leva_fd_aprovada_na_deteccao(tmp_path):
+    """FD que so' a cascata usou fica em FDS; so' a da deteccao entra em DEPENDENCIAS."""
+    from limpeza.esquemas import DependenciaFuncional
+    from limpeza.tipos import Coluna, Correcao, Detector, Trabalho
+
+    nada = "def detectar(col):\n    return col.isin([])\n"
+
+    def trabalho(nome, passos, dependencia=None):
+        serie = pd.Series(["a"], name=nome)
+        return Trabalho(
+            coluna=Coluna(nome=nome, sujo=serie, limpo=serie,
+                          valores_distintos=["a"], contagem={"a": 1}),
+            amostra=None,
+            detector=Detector(codigo=nada, funcao=None, cadeia=""),
+            dependencia=dependencia,
+            correcao=Correcao(passos=passos, trilha={}, cadeia=""),
+        )
+
+    fd_state = {"tipo": "fd", "determinante": "City", "dependente": "State"}
+    fd_city = {"tipo": "fd", "determinante": "brewery", "dependente": "city"}
+    trabalhos = [
+        trabalho("City", []),
+        trabalho("State", [fd_state], DependenciaFuncional(
+            determinante="City", dependente="State", justificativa="teste")),
+        trabalho("city", [fd_city]),
+    ]
+    caminho = empacotar.gerar_limpador(trabalhos, tmp_path / "limpador_dep.py", "teste")
+    spec = importlib.util.spec_from_file_location("limpador_dep", caminho)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    assert mod.DEPENDENCIAS == {"State": ("City", "State")}
+    assert mod.FDS == {"State": ("City", "State"), "city": ("brewery", "city")}

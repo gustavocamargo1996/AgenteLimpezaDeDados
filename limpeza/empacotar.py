@@ -210,6 +210,7 @@ def escrever_limpador(
     detectores_codigo: dict,
     plano_correcao: dict,
     colunas: list,
+    dependencias: dict | None = None,
 ) -> Path:
     """Escreve um limpador .py autonomo (deteccao + correcao + corpo estatico) e devolve o Path."""
     caminho = Path(caminho)
@@ -281,6 +282,8 @@ def escrever_limpador(
         "",
         f"_CORRETORES = {_dict_funcs(corretores_por_col)}",
         "",
+        f"DEPENDENCIAS = {_dict_fds(dependencias or {})}",
+        "",
         f"FDS = {_dict_fds(fds_por_col)}",
         "",
         f"COLUNAS = {colunas!r}",
@@ -301,4 +304,6 @@ def gerar_limpador(trabalhos: list, saida: Path, dataset: str) -> Path:
         plano_correcao={t.coluna.nome: (t.correcao.passos if t.correcao else [])
                         for t in trabalhos},
         colunas=[t.coluna.nome for t in trabalhos],
+        dependencias={t.coluna.nome: (t.dependencia.determinante, t.dependencia.dependente)
+                      for t in trabalhos if t.dependencia is not None},
     )
