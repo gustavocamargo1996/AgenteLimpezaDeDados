@@ -123,6 +123,8 @@ limpeza/
     oraculo.py                escolhe o que rotular na próxima iteração
     refino.py                 loop de active learning que melhora a regra
     mascara.py                aplica detectar(col) por coluna → DataFrame[bool]
+    dependencia.py             etapa 3b — FD sobre a máscara intra: marca quem
+                               desvia da moda condicionada do grupo
   correcao/                 etapa 4 — como consertar
     cascata.py                código → FD → flag, com gate de 100% em cada camada
     regras.py                 agente especificador + agente tradutor (JSON → Python)
@@ -161,7 +163,11 @@ def gerar_limpador(caminho_sujo, caminho_limpo, colunas=None,
         trabalhos.append(_processar_coluna(coluna, agentes))
     _avisar_limpador_vazio(trabalhos)
 
-    mascara = deteccao.construir_mascara(trabalhos, tabela)
+    mascara_intra = deteccao.construir_mascara(trabalhos, tabela)
+    mascara_fd = deteccao.detectar_dependencia(
+        trabalhos, tabela, mascara_intra, agentes["fd"])
+    # A etapa nova recebe a mascara ANTERIOR: e' isso que evita a circularidade.
+    mascara = ((mascara_intra + mascara_fd) > 0).astype(int)
     corrigido = correcao.rodar_cascata(trabalhos, tabela, mascara, agentes)
     limpador = empacotar.gerar_limpador(
         trabalhos, saida / f"limpador_{tabela.nome}_{carimbo}.py", tabela.nome
@@ -173,6 +179,35 @@ def gerar_limpador(caminho_sujo, caminho_limpo, colunas=None,
 
 `_processar_coluna` (amostrar → detectar → refinar) é a única fronteira de
 resiliência do run: ver a seção 7.
+
+### Duas vias de detecção
+
+A detecção tem duas etapas em série, não uma. A **intra-coluna**
+(`deteccao.construir_mascara`) vê o valor isolado: `detectar(col)` olha uma
+célula sem saber o resto da linha. A **FD** (`deteccao.detectar_dependencia`,
+`deteccao/dependencia.py`) vê a linha: propõe um determinante por
+informação mútua, um agente LLM escolhe qual candidata determina a coluna, e
+quem se desvia da **moda condicionada** do grupo (o valor mais comum entre as
+linhas com o mesmo determinante) é marcado.
+
+A FD roda **depois** e recebe `mascara_intra` — a máscara **anterior**, nunca
+a combinada. Isso não é ordem arbitrária: é o que evita a circularidade.
+`fd.moda_condicionada` só soma ao pool linhas onde a detecção é 0 nas duas
+colunas; se a FD recebesse a própria saída (ou a máscara já somada com a
+dela), a moda de um grupo passaria a depender de quais células aquele mesmo
+grupo já havia marcado — um resultado calculado a partir de si mesmo.
+`tests/test_pipeline.py::test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada`
+é o teste que trava essa ordem.
+
+A moda só encontra erro que é **minoria no grupo** — se a maioria das linhas
+de um determinante estiver errada da mesma forma, a moda aprende o erro, não
+a correção. E mesmo quando o erro é minoria genuína a moda pode marcar uma
+linha certa: no `beers`, a FD de teste marca 9 células — 8 acertos e 1 falso
+positivo (a linha do `Blackrocks Brewery`, que é `MA` correto contra seis
+outras linhas `MI` da mesma cervejaria — heterogeneidade real do dado, não
+erro de digitação). O gate de 100% sobre as células rotuladas
+(`fd.validar_fd`) é a proteção: uma FD que erra qualquer célula rotulada
+nunca chega a marcar nada.
 
 ---
 
@@ -193,6 +228,15 @@ Tudo que viaja entre as etapas está em `limpeza/tipos.py`, e nada mais viaja.
 propósito.** Ele não sabe — e não pode passar a saber — que a função se chama
 `detectar` nem que ela recebe uma coluna. Essa ignorância é o que permite
 trocar o contrato de detecção sem tocar no tipo. Ver a seção 8.
+
+**`Trabalho.dependencia` só é preenchido quando a FD passa no gate de 100%**
+(`fd.validar_fd`) — é a `DependenciaFuncional` aprovada, com `determinante`,
+`dependente` e `justificativa`. Quando a FD é proposta e reprova o gate, ou
+quando nenhuma candidata passa no limiar de informação mútua,
+`Trabalho.dependencia` fica `None`; `relatorio.py` só publica a seção da FD no
+`cadeias_deteccao.md` quando o campo não é `None`. Um `Trabalho` sem
+`dependencia` não é erro — é a maioria das colunas, já que a maior parte não
+tem determinante forte o bastante.
 
 ---
 
@@ -347,12 +391,13 @@ run.
 - **Não** comentar: histórico ("antes isso era..."), medição ("reduz 40% do
   tempo"), comparação com o ZeroDC, plano de IA ("aqui poderíamos...").
   Comentário descreve a mecânica do que está ali, ou não existe.
-- Densidade atual: **12,8%** em 2.590 linhas. `tests/medir_verbosidade.py`
+- Densidade atual: **13,1%** em 2.656 linhas, teto **14%** (ver
+  `docs/DECISOES.md#teto-de-densidade-14`). `tests/medir_verbosidade.py`
   mede; use antes de commitar uma tarefa que mexe em muitos arquivos.
 
 ### Exceções
 
-São **19**, sendo 16 no código do repositório e 3 dentro da string `_ESTATICO` de
+São **20**, sendo 17 no código do repositório e 3 dentro da string `_ESTATICO` de
 `empacotar.py` — estes últimos rodam no limpador gerado, não aqui. A regra é:
 exceção existe onde a falha tem um comportamento de degradação **nomeado**,
 nunca como rede genérica. Cite função, não número de linha: linha muda, função
@@ -364,6 +409,7 @@ não.
 | `config.py::_segundos` | `TIMEOUT_LLM` com lixo é ignorado e cai no default do provedor — variável de ambiente ruim não vira traceback no start do container |
 | `correcao/cascata.py::rodar_cascata` | uma coluna ruim não derruba o run; as células marcadas dela viram flag |
 | `correcao/cascata.py::rodar_coluna` | regra de correção que explode numa célula deixa a célula intacta, e ela escala |
+| `deteccao/dependencia.py::detectar_dependencia` | mesma política de `rodar_cascata`, não uma segunda fronteira: uma coluna cuja FD explode (proposta do agente, gate ou moda) fica **sem marca de FD**, com log, e o run continua para a próxima coluna |
 | `deteccao/mascara.py::aplicar_detectores` | `detectar(col)` pode explodir na chamada ou na coerção; a coluna fica zerada com log, sem crash |
 | `deteccao/oraculo.py::_classificar` | idem, no laço de refino: classificação que quebra vira "tudo falso" |
 | `deteccao/refino.py::_tentar_update` (2) | revisão que não passa no portão mantém a regra residente e segue para a próxima iteração |
@@ -375,11 +421,15 @@ não.
 
 ### Loops
 
-São **45** (incluindo `avaliar_limpador.py` e `escolher_modelo.py`). Colapse loops **paralelos** —
+São **47** (incluindo `avaliar_limpador.py` e `escolher_modelo.py`). Colapse loops **paralelos** —
 dois `for` sobre a mesma sequência viram um. Mantenha os que **carregam
 estado** entre iterações: o escalonamento célula a célula da cascata
 (`pendentes`/`restantes`) e o loop de refino são estado acumulado, e fundi-los
-com outra coisa esconde a mecânica que eles implementam.
+com outra coisa esconde a mecânica que eles implementam. Os dois loops de
+`deteccao/dependencia.py` — o `for trabalho` de `detectar_dependencia`
+(acumula `mascara` coluna a coluna) e o `for valor_det` de `_desvios_da_moda`
+(varre os grupos distintos do determinante) — são da mesma família: nenhum
+dos dois é paralelo a outro `for` da função.
 
 ---
 
@@ -407,6 +457,15 @@ só.
 | 8 | `limpeza/deteccao/mascara.py` | aplica `detectar(col)` uma vez por coluna, posicional | não |
 | 9 | `limpeza/esquemas.py::RegraDeteccao` | docstring da classe e `description` do campo `codigo` repetem o contrato | não |
 | 10 | `limpeza/empacotar.py` | cópia congelada da mesma aplicação, no limpador gerado | não |
+
+**Continua 10 pontos, 7 arquivos — a detecção por FD (`deteccao/dependencia.py`)
+não é um 11º ponto.** Ela não conhece o contrato `detectar(col)`: não gera
+código, não passa pelo portão AST, não lê nem escreve a assinatura de nenhuma
+função — recebe a `Tabela` inteira e a máscara intra já pronta, e decide por
+informação mútua e por um agente que escolhe entre nomes de coluna, nunca por
+`ast.parse` de uma função gerada. `git grep -n 'nome_funcao="detectar"' --
+"limpeza/"` acha só `limpeza/deteccao/regra.py:103` — nenhuma ocorrência em
+`deteccao/dependencia.py` nem em `correcao/fd.py`.
 
 **Regra para qualquer tarefa daqui em diante:** esses 10 pontos continuam
 sendo os *únicos* lugares que sabem que a detecção é intra-coluna. Em

@@ -9,11 +9,63 @@ função, não commit.
 
 ## [Não publicado]
 
-Duas frentes desde o último marco: **provedor local e container**
-(19/set/2026) e a **simplificação do gerador** (30/ago/2026). O invariante de
+Três frentes desde o último marco: **detecção por dependência funcional**
+(20/set/2026), **provedor local e container** (19/set/2026) e a
+**simplificação do gerador** (30/ago/2026). O invariante de
 `tests/test_invariante.py` (495 erros, 121 mudanças, 121 TP, precisão 1,0,
 recall 0,2444, F1 0,3929, 71 flags no `beers` de 300 linhas) é o mesmo nas
-duas: nenhuma delas moveu um número publicado.
+três: nenhuma delas moveu um número publicado — o `beers` tem 0% de erro
+cross-column inalcançável intra-coluna, então a FD nova não tem nada para
+marcar nele fora do que a máscara intra já cobria.
+
+### Adicionado — detecção por dependência funcional (20/set/2026)
+
+- **A detecção ganhou uma segunda via.** Além da regra intra-coluna
+  (`detectar(col)`), `limpeza/deteccao/dependencia.py::detectar_dependencia`
+  roda como etapa 3b: propõe um determinante por informação mútua
+  (`correcao/fd.py::candidatos_determinantes`), um agente LLM escolhe qual
+  candidata determina a coluna, e quem se desvia da **moda condicionada** do
+  grupo é marcado. `limpeza/pipeline.py::gerar_limpador` combina as duas
+  máscaras (`(mascara_intra + mascara_fd) > 0`) antes da cascata de correção.
+  A FD recebe sempre a máscara **intra**, nunca a combinada — é o que evita a
+  moda ser calculada a partir do próprio resultado
+  (`tests/test_pipeline.py::test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada`
+  trava a ordem).
+- **O motivo é medido, não especulado.** Um erro é inalcançável para
+  `detectar(col)` quando o mesmo valor sujo aparece certo em algumas linhas e
+  errado em outras — só o contexto da linha separa os dois casos. No `beers`
+  são **0%**; no `environment` são **21,5%** (247/1.147), concentrados por
+  inteiro em `State` (**165 de 165**) e `Climate_Zone` (**82 de 82**). A moda
+  condicionada, medida no `environment` completo, fecha essa lacuna com
+  **F1=1,00** nas duas colunas, zero falso positivo. Ver
+  `docs/DECISOES.md#deteccao-por-fd`.
+- **`Trabalho.dependencia`** guarda a FD aprovada (`determinante`,
+  `dependente`, `justificativa`) só quando ela passa o gate de 100% sobre o
+  rotulado (`correcao/fd.py::validar_fd`, o mesmo gate que já protegia a
+  correção); reprovada, o campo fica `None` e `relatorio.py` não publica
+  seção de FD para a coluna no `cadeias_deteccao.md`.
+- **A moda condicionada não é infalível.** No `beers`, com a máscara intra
+  realista, a FD de teste marca 9 células — 8 acertos e 1 falso positivo (a
+  linha da `Blackrocks Brewery`, `MA` correto contra seis linhas `MI` da
+  mesma cervejaria: heterogeneidade real do dado). O gate de 100% é a
+  proteção contra esse tipo de erro se propagar.
+- **O contrato geral de detecção cross-column (`detectar(df)`) foi avaliado e
+  descartado por ora**: nenhum dos cinco datasets disponíveis tem erro
+  cross-column que não seja violação de FD, e a rota geral mudaria
+  `empacotar.py::_ESTATICO`, obrigando a regerar a fixture congelada que o
+  invariante mede. A costura cross-column do `CLAUDE.md` seção 8 continua
+  **10 pontos, 7 arquivos** — a FD não conhece `detectar(col)` e não é um 11º
+  ponto (`git grep -n 'nome_funcao="detectar"' -- "limpeza/"` só acha
+  `deteccao/regra.py`).
+- **Suíte de 114 para 127 testes**, todos sem API. Densidade de comentário:
+  13,1% em 2.656 linhas — o teto subiu de 13% para 14%
+  (`docs/DECISOES.md#teto-de-densidade-14`), porque `medir_verbosidade.py`
+  conta cada docstring de 1 linha (exigida pela própria política) como 3
+  linhas de "comentário", e um módulo pequeno bem documentado já nasce
+  com piso alto por isso (`deteccao/dependencia.py`: 50 linhas, 26,0%).
+- **Documentação**: seção nova no `CLAUDE.md` ("Duas vias de detecção"),
+  entrada nova no `docs/DECISOES.md` (`#deteccao-por-fd`,
+  `#teto-de-densidade-14`) e subseção nova no `README.md`.
 
 ### Adicionado — provedor local e container (19/set/2026)
 

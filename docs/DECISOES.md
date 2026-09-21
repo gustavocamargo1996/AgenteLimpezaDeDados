@@ -262,6 +262,87 @@ correção, métrica e empacotamento, que não sabem como ela foi construída.
 seção 8, e a original em
 `docs/superpowers/specs/2026-08-30-simplificacao-limpador-design.md`, seção 9.
 
+<a id="deteccao-por-fd"></a>
+## Detecção por dependência funcional
+
+**Decisão:** a FD deixa de ser só camada de correção e passa a **detectar**
+também: `deteccao/dependencia.py::detectar_dependencia` roda como etapa 3b,
+depois da detecção intra-coluna, recebe `mascara_intra` (nunca a combinada) e
+marca quem se desvia da moda condicionada do determinante escolhido pelo
+agente. `limpeza/pipeline.py::gerar_limpador` soma as duas máscaras
+(`(mascara_intra + mascara_fd) > 0`) antes de entrar na cascata de correção.
+
+**Por quê:** medido antes de desenhar, em
+`docs/superpowers/specs/2026-09-20-deteccao-por-dependencia-funcional-design.md`,
+seção 1–2. Um erro é **inalcançável intra-coluna** quando o mesmo valor sujo
+aparece às vezes certo e às vezes errado — nenhuma função do valor sozinho
+separa os dois casos. No `beers`, **0%** dos erros são inalcançáveis: é por
+isso que o invariante do projeto (construído sobre o `beers`) é cego a esta
+lacuna. No `environment`, **21,5%** (247/1.147) são — concentrados por
+inteiro em duas colunas, `State` (**165 de 165**) e `Climate_Zone`
+(**82 de 82**): não é que alguns erros escapem, é que todo erro dessas
+colunas é estruturalmente invisível para qualquer regra `detectar(col)`. A
+forma do erro é sempre a mesma — `State='MH'` numa linha cuja `City` é
+`'Bangalore'` — uma violação de dependência funcional, não um valor
+inválido. Detecção por desvio da moda condicionada, medida no `environment`
+completo, fecha a lacuna com **F1=1,00** nas duas colunas (`City -> State`:
+165 TP, 0 FP, 0 FN; `City -> Climate_Zone`: 82 TP, 0 FP, 0 FN).
+
+**A moda condicionada não é infalível — e não deve ser lida como tal.** No
+`beers`, com a máscara intra realista (não o cenário teórico acima), a FD de
+teste marca 9 células: 8 acertos e **1 falso positivo**, a linha da
+`Blackrocks Brewery` — `State='MA'` é o valor **correto** segundo o `clean`,
+contra seis outras linhas `MI` da mesma cervejaria. É heterogeneidade real do
+dado (o nome da cervejaria não é um determinante de verdade ali), não um bug
+na moda. O gate de 100% sobre as células rotuladas
+(`correcao/fd.py::validar_fd`, mesmo gate que já existia para a correção — ver
+"Gates de 100%") é o que limita o estrago: uma FD que erra qualquer célula
+rotulada nunca chega a marcar nada.
+
+**Por que NÃO o contrato geral `detectar(df)`:** a seção 8 do `CLAUDE.md`
+antecipa um projeto maior — trocar `detectar(col)` por uma forma cross-column
+qualquer. Este trabalho não é aquele. Nenhum dos cinco datasets disponíveis
+(`beers`, `hospital`, `rayyan`, `flights`, `environment`) tem erro
+cross-column que não seja violação de FD — consistência aritmética, ordem
+temporal ou faixa condicionada não aparecem em nenhum deles, então construir
+a capacidade geral agora seria construir sem dado que a valide. E o custo
+seria alto por um motivo concreto: a rota geral mudaria
+`limpeza/empacotar.py::_ESTATICO`, que é copiado byte a byte para o limpador
+gerado e termina a fixture congelada do invariante — mudar o contrato
+obrigaria a regerar a fixture e o invariante, trocando a rede de segurança
+justamente durante a mudança que ela deveria proteger.
+
+**Onde:** `limpeza/deteccao/dependencia.py::detectar_dependencia` (a etapa) e
+`_desvios_da_moda` (a marcação); `limpeza/correcao/fd.py` (`propor_fd`,
+`moda_condicionada`, `validar_fd` — mecânica compartilhada com a camada de
+correção); `limpeza/pipeline.py::gerar_limpador` (a combinação de máscaras);
+`tests/test_pipeline.py::test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada`
+(a ordem) e `tests/test_dependencia.py` (a etapa isolada). A medição completa
+está em
+`docs/superpowers/specs/2026-09-20-deteccao-por-dependencia-funcional-design.md`.
+
+<a id="teto-de-densidade-14"></a>
+## Teto de densidade em 14%
+
+**Decisão:** o teto de densidade de comentário do `CLAUDE.md` §7 sobe de 13%
+para **14%**. A densidade medida ao final da Task 6 é 13,1% em 2.656 linhas —
+dentro do teto novo, fora do antigo.
+
+**Por quê:** `tests/medir_verbosidade.py` conta cada docstring como
+`len(docstring.splitlines()) + 2` linhas de "comentário", e a própria política
+de comentários deste projeto **exige** docstring de 1 linha em todo módulo,
+classe e função. Um módulo pequeno e bem documentado já nasce com piso alto
+só por cumprir a política: `limpeza/deteccao/dependencia.py`, com 50 linhas e
+quatro docstrings de 1 linha (módulo + 3 funções) e nenhum comentário inline
+gordo, mede **26,0%** — mais que o dobro do teto antigo, sem um único
+parágrafo de prosa fora de lugar. Um projeto que manda documentar toda função
+tem um piso imposto pelo próprio instrumento de medida. Trocar o instrumento
+no meio do plano apagaria a comparabilidade com a medição anterior; subir o
+teto e registrar o motivo é a opção honesta.
+
+**Onde:** `CLAUDE.md`, seção 7, "Comentários" (densidade e teto);
+`tests/medir_verbosidade.py::medir` (a fórmula `len(d.splitlines()) + 2`).
+
 <a id="escalonamento-celula-a-celula"></a>
 ## Escalonamento célula a célula
 

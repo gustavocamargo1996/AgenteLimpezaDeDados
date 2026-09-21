@@ -38,8 +38,9 @@ CSV sujo + CSV limpo
   → carga literal (keep_default_na=False)
   → embeddings MiniLM ONNX local → KMeans sobre os valores DISTINTOS
   → representantes (o mais atípico e o mais típico de cada grupo) + rótulos
-  → DETECÇÃO: agente escreve detectar(col), refinada por N iterações com oráculo
-  → máscara 0/1 do dataset
+  → DETECÇÃO intra-coluna: agente escreve detectar(col), refinada por N iterações com oráculo
+  → DETECÇÃO por dependência funcional: sobre a máscara intra, marca desvio da moda condicionada
+  → máscara 0/1 do dataset (as duas vias combinadas)
   → CORREÇÃO em cascata: regra de código → dependência funcional → flag
        (cada camada com gate de 100% no rotulado; célula intacta escala)
   → limpador autônomo empacotado + métricas + cadeias
@@ -47,6 +48,23 @@ CSV sujo + CSV limpo
 
 Nenhuma célula recebe valor inventado: o que nenhuma camada resolve fica
 sinalizado com o valor sujo original.
+
+### Duas vias de detecção
+
+A detecção roda em duas etapas, não uma. A **intra-coluna** vê o valor
+isolado — `detectar(col)` não sabe o resto da linha. A **dependência
+funcional** (`deteccao/dependencia.py`) vê a linha: propõe um determinante
+por informação mútua e marca quem se desvia da moda condicionada do grupo —
+o tipo de erro que só existe em contexto, como `State='MH'` numa linha cuja
+`City='Bangalore'`. A FD roda **depois** da intra-coluna e recebe a máscara
+dela como entrada (nunca a combinada), o que evita que a moda seja calculada
+a partir do próprio resultado.
+
+Quem lê `cadeias_deteccao.md` de um run passa a ver, por coluna, até duas
+justificativas: a cadeia de pensamento da regra intra-coluna e — só quando a
+FD passou no gate de 100% sobre o rotulado — o determinante escolhido e a
+justificativa do agente para ele. Coluna sem FD aprovada não ganha essa
+segunda seção; não é omissão, é o gate reprovando.
 
 ## Rodando
 
@@ -348,7 +366,7 @@ F1 de reparo. Não faz nenhuma chamada de LLM:
 .venv/Scripts/python -m pytest tests/ -v
 ```
 
-114 testes, nenhum gasta API — os agentes LLM são substituídos por dublês e o
+127 testes, nenhum gasta API — os agentes LLM são substituídos por dublês e o
 invariante mede um limpador congelado. Um teste (`tests/test_embeddings.py`)
 exercita o modelo ONNX real e **pula** quando o modelo não está no disco; use
 `pytest -rs` para ver os pulados.
@@ -411,11 +429,14 @@ A chave de API vive em `.env`, que está no `.gitignore`.
 
 ## Fora de escopo
 
-FAISS e RAG de tuplas vizinhas · detecção cross-column (é o próximo projeto,
-não um descarte — ver `CLAUDE.md` seção 8) · fallback por célula via LLM
-(medido e rejeitado, ver `docs/DECISOES.md#veredito-contra-o-fallback`) ·
-destilação professor→aluno · detecção de erro a partir do CSV limpo (ele serve
-para *medir*, nunca para detectar).
+FAISS e RAG de tuplas vizinhas · o contrato geral de detecção cross-column,
+`detectar(df)` (a detecção por dependência funcional já cobre o único padrão
+de erro cross-column presente nos datasets disponíveis; o contrato geral
+continua o próximo projeto, não um descarte — ver `CLAUDE.md` seção 8 e
+`docs/DECISOES.md#deteccao-por-fd`) · fallback por célula via LLM (medido e
+rejeitado, ver `docs/DECISOES.md#veredito-contra-o-fallback`) · destilação
+professor→aluno · detecção de erro a partir do CSV limpo (ele serve para
+*medir*, nunca para detectar).
 
 ## Onde ler mais
 
