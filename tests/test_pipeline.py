@@ -66,6 +66,14 @@ def test_coluna_que_falha_na_deteccao_vira_detector_nulo(monkeypatch):
     assert trabalho.correcao is None
 
 
+class _AgenteFdBloqueado:
+    """Explode se chamado: so' nao chama porque candidatos_determinantes==[] barra antes."""
+
+    def invoke(self, _a):
+        raise AssertionError(
+            "agente de fd foi chamado apesar de candidatos_determinantes==[]")
+
+
 def _fingir_agentes(monkeypatch):
     """Troca todo LLM da espinha por resposta fixa, para rodar o run offline."""
     def regra_oz(_entrada):
@@ -80,7 +88,8 @@ def _fingir_agentes(monkeypatch):
 
     monkeypatch.setattr(amostragem, "embedder", _EmbedderFalso)
     monkeypatch.setattr(pipeline, "_construir_agentes",
-                        lambda: {"deteccao": RunnableLambda(regra_oz), "fd": None})
+                        lambda: {"deteccao": RunnableLambda(regra_oz),
+                                "fd": _AgenteFdBloqueado()})
     monkeypatch.setattr(cascata, "_camada_codigo", camada_codigo)
     monkeypatch.setattr(fd_mod, "candidatos_determinantes",
                         lambda *_a, **_k: [])
@@ -140,8 +149,43 @@ def test_espinha_absorve_os_dicionarios_paralelos_num_trabalho(tmp_path, monkeyp
         assert set(trabalho.medida) == {"deteccao", "correcao"}
 
 
-def test_beers_nao_ganha_nenhuma_marca_de_fd():
-    """O beers nao tem erro cross-column; uma marca sequer e' vazamento."""
+def test_deteccao_por_fd_recebe_a_mascara_intra_e_nao_a_combinada(tmp_path, monkeypatch):
+    """A ordem que evita circularidade: a FD recebe SEMPRE a mascara anterior."""
+    _fingir_agentes(monkeypatch)
+    recebidas = []
+    intra_capturada = {}
+    original_construir_mascara = deteccao.construir_mascara
+
+    def espiar_mascara(trabalhos, tabela):
+        m = original_construir_mascara(trabalhos, tabela)
+        intra_capturada["valor"] = m.copy()
+        return m
+
+    def fd_falsa(_trabalhos, tabela, mascara_intra, _agente):
+        recebidas.append(mascara_intra.copy())
+        # Marca uma celula que a intra nunca marcaria: se o pipeline reusar
+        # esta saida como entrada de uma proxima chamada, a diferenca aparece.
+        fake = pd.DataFrame(0, index=tabela.sujo.index, columns=tabela.sujo.columns, dtype=int)
+        fake.loc[fake.index[0], "city"] = 1
+        return fake
+
+    monkeypatch.setattr(deteccao, "construir_mascara", espiar_mascara)
+    monkeypatch.setattr(deteccao, "detectar_dependencia", fd_falsa)
+
+    pipeline.gerar_limpador(
+        caminho_sujo=FIXTURES / "beers_dirty_300.csv",
+        caminho_limpo=FIXTURES / "beers_clean_300.csv",
+        colunas=["ounces", "city"],
+        saida=tmp_path,
+    )
+
+    assert recebidas, "detectar_dependencia nao foi chamada"
+    for recebida in recebidas:
+        pd.testing.assert_frame_equal(recebida, intra_capturada["valor"])
+
+
+def test_fd_do_beers_marca_um_unico_falso_positivo_conhecido():
+    """FD sobre state com a mascara intra REAL do beers: 8 TP e 1 FP ja identificado."""
     from limpeza.deteccao import dependencia
     from limpeza.esquemas import DependenciaFuncional
 
@@ -171,13 +215,20 @@ def test_beers_nao_ganha_nenhuma_marca_de_fd():
             return DependenciaFuncional(determinante="brewery-name", dependente="state",
                                         justificativa="cervejaria fixa o estado")
 
-    zerada = pd.DataFrame(0, index=sujo.index, columns=sujo.columns, dtype=int)
-    m = dependencia.detectar_dependencia([trabalho], tabela, zerada, _Agente())
-    marcadas = int(m["state"].sum())
-    erradas = int((sujo["state"] != limpo["state"]).sum())
-    assert marcadas <= erradas, (
-        f"marcou {marcadas} celulas em state, mas so' {erradas} estao erradas: "
-        "a FD esta marcando celula correta")
+    # Mascara intra REAL do beers: todos os 9 erros de state sao string vazia.
+    # Passar a mascara zerada (como antes) escondia o efeito do duplo filtro:
+    # em grupo de 2 linhas (1 correta + 1 vazia), sem mascara a vazia disputa a
+    # moda e vence, inflando os falsos positivos de 1 para 3.
+    intra = pd.DataFrame(0, index=sujo.index, columns=sujo.columns, dtype=int)
+    intra["state"] = (sujo["state"] == "").astype(int)
+
+    m = dependencia.detectar_dependencia([trabalho], tabela, intra, _Agente())
+    erro = sujo["state"] != limpo["state"]
+    falso_positivo = m["state"].astype(bool) & ~erro
+    assert int(m["state"].sum()) == 9
+    # Blackrocks Brewery tem 1 linha MA e 6 MI; o limpo confirma MA correto --
+    # e' heterogeneidade real do dado, brewery-name nao e' determinante de verdade.
+    assert int(falso_positivo.sum()) == 1
 
 
 def test_iteracoes_deteccao_1_nao_refina(monkeypatch):
