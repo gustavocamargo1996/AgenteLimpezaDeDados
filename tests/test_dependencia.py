@@ -162,6 +162,29 @@ def test_excecao_numa_coluna_nao_derruba_as_outras():
     assert int(m["Climate_Zone"].sum()) == 26, "a seguinte segue normalmente"
 
 
+def test_a_justificativa_da_fd_sai_no_relatorio(tmp_path):
+    """A cadeia de pensamento e' produto; a FD tambem tem uma."""
+    from limpeza import relatorio
+    from limpeza.esquemas import DependenciaFuncional
+
+    from limpeza.tipos import Detector
+
+    tabela = _tabela_environment(["State"])
+    trabalhos = _trabalhos(tabela)
+    # `_cadeias_md` le detector.erro_provavel sem guarda; em producao o detector
+    # nunca e' None (o pipeline sempre poe um, real ou nulo).
+    trabalhos[0].detector = Detector(codigo="def detectar(col):\n    return col.isin([])\n",
+                                     funcao=None, cadeia="sem regra intra-coluna")
+    trabalhos[0].medida = {"deteccao": {}}
+    trabalhos[0].dependencia = DependenciaFuncional(
+        determinante="City", dependente="State",
+        justificativa="cada cidade pertence a um unico estado")
+
+    md = relatorio._cadeias_md("environment", trabalhos)
+    assert "cada cidade pertence a um unico estado" in md
+    assert "City" in md
+
+
 def test_cascata_reaproveita_a_fd_em_vez_de_propor(monkeypatch):
     """A FD que marcou e' a que corrige; propor de novo poderia discordar."""
     from limpeza.correcao import cascata, fd as fd_real

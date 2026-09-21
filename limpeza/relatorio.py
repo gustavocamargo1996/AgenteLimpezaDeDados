@@ -101,8 +101,8 @@ def _cascata_md(nome: str, trabalhos: list) -> str:
 def _cadeias_md(nome: str, trabalhos: list) -> str:
     partes = [
         _titulo("Cadeias de deteccao", nome),
-        f"\nDeteccao INTRA-COLUNA (a regra ve um escalar, nao a linha). "
-        f"Modelo `{config.MODELO_LLM}`.\n",
+        f"\nDuas vias: a regra intra-coluna ve um escalar, e a dependencia "
+        f"funcional ve a linha. Modelo `{config.MODELO_LLM}`.\n",
     ]
     for trabalho in trabalhos:
         detector = trabalho.detector
@@ -119,5 +119,10 @@ def _cadeias_md(nome: str, trabalhos: list) -> str:
         partes.append("**Codigo de deteccao:**\n\n```python\n" + (detector.codigo or "") + "\n```\n")
         if config.ITERACOES_DETECCAO > 1:
             partes.append(_bloco_refinamento(detector.historico, detector.orcamento))
+        if trabalho.dependencia is not None:
+            fd = trabalho.dependencia
+            partes.append(
+                f"\n**Dependencia funcional:** `{fd.determinante}` -> `{fd.dependente}`\n")
+            partes.append(f"**Justificativa:**\n\n{fd.justificativa}\n")
 
     return "\n".join(partes)
