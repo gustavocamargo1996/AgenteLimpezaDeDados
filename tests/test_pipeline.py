@@ -215,10 +215,8 @@ def test_fd_do_beers_marca_um_unico_falso_positivo_conhecido():
             return DependenciaFuncional(determinante="brewery-name", dependente="state",
                                         justificativa="cervejaria fixa o estado")
 
-    # Mascara intra REAL do beers: todos os 9 erros de state sao string vazia.
-    # Passar a mascara zerada (como antes) escondia o efeito do duplo filtro:
-    # em grupo de 2 linhas (1 correta + 1 vazia), sem mascara a vazia disputa a
-    # moda e vence, inflando os falsos positivos de 1 para 3.
+    # Mascara intra REAL: os 9 erros de state sao string vazia, e o duplo filtro
+    # as tira da moda -- sem ela a vazia vence em grupo de 2 e gera 3 FPs.
     intra = pd.DataFrame(0, index=sujo.index, columns=sujo.columns, dtype=int)
     intra["state"] = (sujo["state"] == "").astype(int)
 
