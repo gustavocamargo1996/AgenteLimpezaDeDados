@@ -19,3 +19,19 @@ def test_f1_reparo_do_limpador_congelado():
     assert total["recall"] == 0.2444
     assert total["f1"] == 0.3929
     assert total["flags"] == 71
+
+
+def test_f1_reparo_do_limpador_environment_congelado():
+    """Trava o limpador do run pago do environment: DEPENDENCIAS empacotada."""
+    total = avaliar(
+        caminho_limpador=FIXTURES / "limpador_environment_congelado.py",
+        caminho_sujo=FIXTURES / "environment_dirty_300.csv",
+        caminho_limpo=FIXTURES / "environment_clean_300.csv",
+    )["total"]
+    assert total["erros"] == 334
+    assert total["mudancas"] == 44
+    assert total["tp"] == 44
+    assert total["precisao"] == 1.0
+    assert total["recall"] == 0.1317
+    assert total["f1"] == 0.2328
+    assert total["flags"] == 663
