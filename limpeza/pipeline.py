@@ -23,7 +23,11 @@ def gerar_limpador(caminho_sujo, caminho_limpo, colunas=None,
         trabalhos.append(_processar_coluna(coluna, agentes))
     _avisar_limpador_vazio(trabalhos)
 
-    mascara = deteccao.construir_mascara(trabalhos, tabela)
+    mascara_intra = deteccao.construir_mascara(trabalhos, tabela)
+    mascara_fd = deteccao.detectar_dependencia(
+        trabalhos, tabela, mascara_intra, agentes["fd"])
+    # A etapa nova recebe a mascara ANTERIOR: e' isso que evita a circularidade.
+    mascara = ((mascara_intra + mascara_fd) > 0).astype(int)
     corrigido = correcao.rodar_cascata(trabalhos, tabela, mascara, agentes)
     limpador = empacotar.gerar_limpador(
         trabalhos, saida / f"limpador_{tabela.nome}_{carimbo}.py", tabela.nome

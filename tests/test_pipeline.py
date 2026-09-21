@@ -12,7 +12,7 @@ from langchain_core.runnables import RunnableLambda
 from limpeza import amostragem, config, deteccao, pipeline
 from limpeza.correcao import cascata, fd as fd_mod
 from limpeza.esquemas import RegraDeteccao
-from limpeza.tipos import Amostra, Coluna, Trabalho
+from limpeza.tipos import Amostra, Coluna, Tabela, Trabalho
 
 import main as cli
 
@@ -80,7 +80,7 @@ def _fingir_agentes(monkeypatch):
 
     monkeypatch.setattr(amostragem, "embedder", _EmbedderFalso)
     monkeypatch.setattr(pipeline, "_construir_agentes",
-                        lambda: {"deteccao": RunnableLambda(regra_oz)})
+                        lambda: {"deteccao": RunnableLambda(regra_oz), "fd": None})
     monkeypatch.setattr(cascata, "_camada_codigo", camada_codigo)
     monkeypatch.setattr(fd_mod, "candidatos_determinantes",
                         lambda *_a, **_k: [])
@@ -138,6 +138,46 @@ def test_espinha_absorve_os_dicionarios_paralelos_num_trabalho(tmp_path, monkeyp
         assert trilha["coluna"] == trabalho.coluna.nome
         assert sum(contagem.values()) == trilha["marcadas"]
         assert set(trabalho.medida) == {"deteccao", "correcao"}
+
+
+def test_beers_nao_ganha_nenhuma_marca_de_fd():
+    """O beers nao tem erro cross-column; uma marca sequer e' vazamento."""
+    from limpeza.deteccao import dependencia
+    from limpeza.esquemas import DependenciaFuncional
+
+    LER = dict(dtype=str, keep_default_na=False, na_values=[])
+    sujo = pd.read_csv(FIXTURES / "beers_dirty_300.csv", **LER)
+    limpo = pd.read_csv(FIXTURES / "beers_clean_300.csv", **LER)
+
+    col = Coluna(nome="state", sujo=sujo["state"], limpo=limpo["state"],
+                valores_distintos=sorted(sujo["state"].unique()),
+                contagem=sujo["state"].value_counts().to_dict())
+    tabela = Tabela(sujo=sujo, limpo=limpo, nome="beers", colunas=[col])
+    linhas = list(range(10))
+    rot = [{"indice": i, "sujo": col.sujo.at[i], "limpo": col.limpo.at[i],
+            "eh_erro": col.sujo.at[i] != col.limpo.at[i]} for i in linhas]
+    trabalho = Trabalho(coluna=col, detector=None,
+                        amostra=Amostra(representantes=[], linhas=set(linhas),
+                                        rotulados=rot, total_linhas=len(sujo),
+                                        total_distintos=0))
+
+    class _Agente:
+        def invoke(self, _a):
+            return self(_a)
+
+        # __call__ (alem de invoke) deixa `prompt | agente` coercer este duble,
+        # senao o proprio TypeError da coercao mascara o teste (vira "0 marcas" sempre).
+        def __call__(self, _a):
+            return DependenciaFuncional(determinante="brewery-name", dependente="state",
+                                        justificativa="cervejaria fixa o estado")
+
+    zerada = pd.DataFrame(0, index=sujo.index, columns=sujo.columns, dtype=int)
+    m = dependencia.detectar_dependencia([trabalho], tabela, zerada, _Agente())
+    marcadas = int(m["state"].sum())
+    erradas = int((sujo["state"] != limpo["state"]).sum())
+    assert marcadas <= erradas, (
+        f"marcou {marcadas} celulas em state, mas so' {erradas} estao erradas: "
+        "a FD esta marcando celula correta")
 
 
 def test_iteracoes_deteccao_1_nao_refina(monkeypatch):
