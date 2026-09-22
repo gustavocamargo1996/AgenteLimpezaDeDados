@@ -89,7 +89,8 @@ def _imprimir(modelo: str, placar: dict, segundos: float) -> None:
     if det["portao_ok"]:
         print("\n  Serve: a deteccao gera codigo que o portao aceita.")
     else:
-        print("\n  NAO serve: sem deteccao aceita pelo portao, o limpador sai vazio.")
+        print("\n  NAO serve: sem deteccao aceita pelo portao, o limpador sai sem "
+              "deteccao intra-coluna -- so detecta o que uma FD aprovada marcar.")
 
 
 def main(argv=None) -> int:

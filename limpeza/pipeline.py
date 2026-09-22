@@ -70,18 +70,18 @@ def _processar_coluna(coluna: Coluna, agentes: dict) -> Trabalho:
 
 def _avisar_limpador_vazio(trabalhos: list) -> None:
     """Avisa alto quando nenhuma coluna saiu com regra de deteccao intra-coluna."""
-    # Sem isso, LLM fora do ar termina com exit 0 e um limpador vazio: job verde.
-    # Roda ANTES da FD; o aviso vale mesmo que ela marque celulas no run.
+    # Sem isso, LLM fora do ar termina com exit 0 e um limpador sem deteccao intra: job verde.
+    # Roda antes da FD: a FD aprovada ainda detecta e corrige no limpador gerado.
     com_regra = [t for t in trabalhos
                  if t.detector is not None
                  and t.detector.codigo != deteccao.DETECTA_NADA]
     if trabalhos and not com_regra:
         print(f"\n  AVISO: 0/{len(trabalhos)} colunas receberam regra de "
               "deteccao intra-coluna aceita; o limpador empacotado sai SEM "
-              "detector para nenhuma delas -- isso vale mesmo que a deteccao "
-              "por FD, mais adiante, marque celulas no run, porque essa via "
-              "nao e' reproduzida no arquivo gerado. Se nao esperava isso, "
-              "verifique PROVEDOR, MODELO_LLM e o log de falhas acima.\n",
+              "detector intra-coluna para nenhuma delas -- so vai detectar "
+              "o que as FDs aprovadas, se houver, marcarem no run. Se nao "
+              "esperava isso, verifique PROVEDOR, MODELO_LLM e o log de "
+              "falhas acima.\n",
               flush=True)
 
 

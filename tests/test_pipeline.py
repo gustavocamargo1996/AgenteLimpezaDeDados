@@ -438,6 +438,7 @@ def test_avisa_quando_nenhuma_coluna_recebeu_regra(capsys):
     pipeline._avisar_limpador_vazio(trabalhos)
     saida = capsys.readouterr().out
     assert "AVISO: 0/2 colunas receberam regra de deteccao" in saida
+    assert "nao e' reproduzida" not in saida
 
 
 def test_nao_avisa_quando_ao_menos_uma_coluna_tem_regra(capsys):
