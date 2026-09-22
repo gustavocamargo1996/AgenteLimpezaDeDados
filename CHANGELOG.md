@@ -46,17 +46,25 @@ detecção — inclusive a esta.
   de um run pago em 21/set (`erros=334, mudancas=44, tp=44, precisao=1.0,
   recall=0.1317, f1=0.2328, flags=663`). `test_estatico_congelado.py` agora
   vale para as duas fixtures.
-- **O achado do run pago: a FD não contribuiu no `environment`.** O LLM
-  reprovou `City→State` no gate e aprovou `City→Climate_Zone`, mas as regras
-  intra-coluna que ele escreveu para `State` e `Climate_Zone` marcam **todas
-  as 300 células** — o único jeito de acertar 100% do rotulado quando todo
-  erro é inalcançável intra-coluna. Marcar tudo tira da moda condicionada
-  toda linha limpa e anula a FD por construção: contribuição medida de
-  **zero** marcas extras nas duas colunas, correção **0%** nelas. O limpador
-  reproduz o run fielmente — inclusive esse resultado —, mas a lacuna real
-  não é o empacotamento: é a interação entre o gate de 100% intra-coluna e a
-  FD, uma lacuna de desenho conhecida e nomeada, não resolvida aqui. Ver
+- **O achado do run pago: a FD não contribuiu no `environment`.** O gate de
+  100% (determinístico) reprovou `City→State` e aprovou `City→Climate_Zone` —
+  o LLM só propôs os determinantes —, mas as regras intra-coluna que ele
+  escreveu para `State` e `Climate_Zone` marcam **todas as 300 células** — o
+  único jeito de acertar 100% do rotulado quando todo erro é inalcançável
+  intra-coluna. Marcar tudo tira da moda condicionada toda linha limpa e
+  anula a FD por construção: contribuição medida de **zero** marcas extras
+  nas duas colunas, correção **0%** nelas. O limpador reproduz o run
+  fielmente — inclusive esse resultado —, mas a lacuna real não é o
+  empacotamento: é a interação entre o gate de 100% intra-coluna e a FD, uma
+  lacuna de desenho conhecida e nomeada, não resolvida aqui. Ver
   `docs/DECISOES.md#fd-no-limpador`.
+- **Duas lacunas a mais, registradas no mesmo lugar.** `DEPENDENCIAS` sem
+  entrada em `FDS` é possível e acontece na fixture (`Country`): a FD detecta
+  no limpador mas não corrige, se a coluna não tinha célula pendente no run.
+  E o gate de `City→Climate_Zone` aprovou **por vacuidade** — as 2 células
+  rotuladas da coluna não tinham erro nenhum, então o gate não testou a FD
+  contra nada; ela foi para o produto do mesmo jeito que uma FD validada de
+  verdade.
 - **Suíte de 129 para 139 testes**, todos sem API. Densidade de comentário:
   13,0% em 2.699 linhas, dentro do teto de 14%.
 

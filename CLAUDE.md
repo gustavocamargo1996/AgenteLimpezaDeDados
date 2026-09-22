@@ -207,7 +207,11 @@ positivo (a linha do `Blackrocks Brewery`, que é `MA` correto contra seis
 outras linhas `MI` da mesma cervejaria — heterogeneidade real do dado, não
 erro de digitação). O gate de 100% sobre as células rotuladas
 (`fd.validar_fd`) é a proteção: uma FD que erra qualquer célula rotulada
-nunca chega a marcar nada.
+nunca chega a marcar nada. Isso não garante que a FD foi testada — se
+nenhuma célula rotulada da coluna estiver errada, o gate compara sujo com
+limpo sem ter erro nenhum para pegar, e aprova por vacuidade
+(`docs/DECISOES.md#fd-no-limpador`, o caso de `Climate_Zone` no
+`environment`).
 
 **A via da FD viaja para o limpador.** O arquivo gerado leva dois dicionários
 — `DEPENDENCIAS` (as FDs que passaram no gate da *detecção*, vindas de
@@ -346,14 +350,17 @@ dicionário de `nome_funcao`/`nome_argumento`: é assim que a ferramenta mede o
 degrau real do pipeline sem virar um 11º ponto da lista da seção 8.
 
 **O critério de aprovação é a linha da detecção.** Um modelo que preenche o
-schema mas cujo `detectar(col)` o portão rejeita produz **limpador vazio** —
-por melhor que seja nos outros três papéis. A cadeia é mecânica: sem regra
-aceita, `_processar_coluna` cai para `detector_nulo` (`DETECTA_NADA`, que é
-`col.isin([])`); um detector que não marca nada dá máscara toda zero; máscara
-zero não dá nenhuma célula para a cascata corrigir; e o limpador empacotado
-sai com esse detector e plano de correção vazio. É por isso que `_imprimir`
-decide o veredito olhando só `placar["deteccao"]["portao_ok"]`: os outros três
-papéis não salvam um run cuja detecção não passou no portão.
+schema mas cujo `detectar(col)` o portão rejeita produz um limpador **sem
+detecção intra-coluna** — por melhor que seja nos outros três papéis. A
+cadeia é mecânica: sem regra aceita, `_processar_coluna` cai para
+`detector_nulo` (`DETECTA_NADA`, que é `col.isin([])`); um detector que não
+marca nada dá máscara intra toda zero. Isso não faz o limpador sair vazio: se
+alguma FD passou no gate da detecção, ela ainda soma marcas à máscara e a
+cascata ainda corrige por ela — é o cenário que
+`tests/test_empacotar.py::test_limpador_com_fd_injetada_corrige_o_environment`
+exercita. É por isso que `_imprimir` decide o veredito olhando só
+`placar["deteccao"]["portao_ok"]`: os outros três papéis não salvam um run
+cuja detecção intra-coluna não passou no portão.
 
 ---
 
@@ -407,12 +414,17 @@ batendo byte a byte com o final de cada uma. Se ela divergir, o limpador que
 a POC gera hoje deixou de ser o mesmo que o invariante mede — e os números
 acima passam a mentir sobre o run.
 
-O invariante do `environment` prova que **o limpador reproduz o run**, não que
-a FD contribuiu nele: o LLM reprovou `City→State` no gate e as regras
-intra-coluna de `State`/`Climate_Zone` marcam todas as 300 células, o que
-anula a FD por construção (ver `docs/DECISOES.md#fd-no-limpador`). Quem prova
-o mecanismo da FD no limpador — que ela detecta e corrige quando o gate
-aprova — é `tests/test_equivalencia.py` e
+O invariante do `environment` **trava o limpador que reproduziu o run**,
+conferido contra os artefatos do run (`mascara.csv`, `correcoes.csv`) no
+momento do congelamento, 0 divergências célula por célula — não é o
+invariante sozinho que prova isso: zerar `DEPENDENCIAS`/`FDS` na fixture
+deixa `test_invariante.py`/`test_estatico_congelado.py` verdes do mesmo jeito,
+porque nenhum dos sete números se move sem FD. E o invariante não prova que a
+FD contribuiu no run: o gate de 100% (determinístico) reprovou `City→State` e
+as regras intra-coluna de `State`/`Climate_Zone` marcam todas as 300 células,
+o que anula a FD por construção (ver `docs/DECISOES.md#fd-no-limpador`). Quem
+prova o mecanismo da FD no limpador — que ela detecta e corrige quando o
+gate aprova — é `tests/test_equivalencia.py` e
 `tests/test_empacotar.py::test_limpador_com_fd_injetada_corrige_o_environment`.
 
 ---

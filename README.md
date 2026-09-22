@@ -195,14 +195,15 @@ papéis que geram código quantas vezes o portão aceitou:
   codigo               3/3             3/3
   fd                   3/3               -
 
-  NAO serve: sem deteccao aceita pelo portao, o limpador sai vazio.
+  NAO serve: sem deteccao aceita pelo portao, o limpador sai sem deteccao
+  intra-coluna -- so detecta o que uma FD aprovada marcar.
 ```
 
 **O critério é a linha da detecção.** Um modelo que não gera `detectar(col)`
-aceito pelo portão produz limpador vazio, por melhor que seja nos outros três
-papéis: sem regra de detecção não há máscara, e sem máscara a cascata não tem
-célula para corrigir. O placar acima é real — é o do `qwen2.5:3b`, e é por
-isso que ele não foi adotado.
+aceito pelo portão produz um limpador **sem detecção intra-coluna**, por
+melhor que seja nos outros três papéis: sem regra intra, a única via que
+resta é a FD, e só se ela passar no gate. O placar acima é real — é o do
+`qwen2.5:3b`, e é por isso que ele não foi adotado.
 
 `--repeticoes` muda o denominador (3 por padrão) e `--modelo` vale para os
 quatro papéis de uma vez.

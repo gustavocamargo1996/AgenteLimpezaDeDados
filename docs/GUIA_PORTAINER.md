@@ -158,8 +158,9 @@ Ele faz 12 chamadas e imprime uma tabela assim:
 ```
 
 **Olhe a linha `deteccao`, coluna `portao AST`.** Se ela vier `0/3`, esse
-modelo **não serve**: ele vai produzir um limpador vazio por melhor que seja
-no resto. Volte ao passo 3 e baixe um modelo maior ou diferente.
+modelo **não serve**: ele vai produzir um limpador sem detecção
+intra-coluna, por melhor que seja no resto. Volte ao passo 3 e baixe um
+modelo maior ou diferente.
 
 Se disser **"Serve"**, siga em frente.
 

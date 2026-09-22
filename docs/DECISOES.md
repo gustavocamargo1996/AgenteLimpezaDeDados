@@ -360,6 +360,20 @@ máscara do artefato além do que a métrica publicada descreve.
 depois do gate de 100%, ver `#deteccao-por-fd` — então uma coluna com entrada
 em `FDS` mas sem `dependencia` fica fora de `DEPENDENCIAS`.
 
+**O caso inverso também existe, e é assimétrico: FD em `DEPENDENCIAS` sem
+entrada em `FDS`.** Se a coluna não tem nenhuma célula pendente no run —
+nada sobrou para a cascata resolver —, `correcao/cascata.py::rodar_coluna`
+nem chama o gate de correção, e nenhum passo `fd` é emitido para ela; a
+mesma FD que passou no gate da detecção não passa a existir também como
+correção. No limpador, essa coluna é marcada pela FD (via `DEPENDENCIAS`) mas
+não tem entrada em `FDS` para corrigir a marca: a célula vira **flag**. É
+fiel ao run — a cascata da POC, no mesmo cenário, também não tinha nada para
+corrigir ali —, mas numa tabela nova da mesma origem, com células novas que a
+FD marcaria, o limpador detecta e não corrige. Na fixture do `environment`,
+`Country` está nesse caso: entra em `DEPENDENCIAS`, não entra em `FDS`. Mudar
+esse comportamento — por exemplo, emitir o passo `fd` sempre que a FD for
+aprovada, com ou sem célula pendente no run — é outro projeto.
+
 **A guarda contra as duas cópias divergirem:** a lógica da FD existe duas
 vezes por construção — o limpador é autônomo, não importa nada deste
 repositório —, uma em `deteccao/dependencia.py` (POC) e outra em
@@ -385,20 +399,31 @@ duas FDs que `FDS` já carregava (`city`, `state`) continuam só corrigindo,
 como antes.
 
 **O invariante do `environment`, e o que ele prova.** Run pago em 21/set,
-`environment_dirty_300.csv`, todas as 11 colunas, OpenAI `gpt-4o-mini`,
+`environment_dirty_300.csv`, as **10** colunas que `dados.carregar` mantém —
+o CSV tem 11, mas `index` é descartado na carga —, OpenAI `gpt-4o-mini`,
 iterações padrão, congelado em `limpador_environment_congelado.py`. O
 `avaliar_limpador.py` sobre as 300 linhas trava
 **erros=334, mudancas=44, tp=44, precisao=1.0, recall=0.1317, f1=0.2328,
-flags=663** (`test_f1_reparo_do_limpador_environment_congelado`). No gate da
-detecção, o LLM aprovou `City→Country` e `City→Climate_Zone`; reprovou
-`City→State` e `Country→City`. O limpador saiu com
-`DEPENDENCIAS = {Country: City, Climate_Zone: City}` e
-`FDS = {Climate_Zone: City}`. A diferença de base entre o número publicado
-pelo run e o que `avaliar_limpador` mede é a esperada e já documentada em
-`#orcamento-vs-gabarito`: o run mede fora das linhas rotuladas (o holdout),
-`avaliar_limpador` mede a tabela de 300 linhas inteira — nos dois,
-`Monitoring_Station_ID` fica com correção de praticamente 100% e o resto
-perto de 0%, o que é fidelidade ao run, não regressão.
+flags=663** (`test_f1_reparo_do_limpador_environment_congelado`). O gate da
+detecção — `fd.validar_fd`, determinístico, sobre as células rotuladas —
+aprovou `City→Country` e `City→Climate_Zone`, e reprovou `City→State` e
+`Country→City`; o LLM só propôs os determinantes, quem aprova ou reprova é o
+gate. O limpador saiu com `DEPENDENCIAS = {Country: City, Climate_Zone: City}`
+e `FDS = {Climate_Zone: City}` (`Country` é o caso do parágrafo acima: FD
+aprovada na detecção, sem célula pendente para corrigir). A diferença de base
+entre o número publicado pelo run e o que `avaliar_limpador` mede é a
+esperada e já documentada em `#orcamento-vs-gabarito`: o run mede fora das
+linhas rotuladas (o holdout), `avaliar_limpador` mede a tabela de 300 linhas
+inteira — nos dois, `Monitoring_Station_ID` fica com correção de praticamente
+100% e o resto perto de 0%, o que é fidelidade ao run, não regressão.
+
+Esse invariante **trava o limpador que reproduziu o run**, conferido contra
+os artefatos do run no momento do congelamento (`mascara.csv` e
+`correcoes.csv`, 0 divergências célula por célula) — ele não prova isso
+sozinho, porque zerar `DEPENDENCIAS`/`FDS` na fixture não move nenhum dos
+sete números travados por `test_invariante.py`/`test_estatico_congelado.py`.
+Quem prova o mecanismo da FD no limpador, em qualquer cenário, é o teste de
+equivalência e o teste ponta a ponta com FD injetada, abaixo.
 
 **O achado: a detecção intra super-marcada anula a FD justamente onde ela
 seria necessária.** `State` e `Climate_Zone` são as duas colunas cujo erro é
@@ -424,6 +449,24 @@ equivalência acima e
 `tests/test_empacotar.py::test_limpador_com_fd_injetada_corrige_o_environment`,
 que injeta `DEPENDENCIAS` com as duas colunas e mede o limpador corrigindo
 54/54 erros de `State` e 26/26 de `Climate_Zone`.
+
+**Uma segunda lacuna, distinta da acima: `City→Climate_Zone` foi aprovada por
+vacuidade — o gate passou sem testar nada.** `Climate_Zone` tinha 2 células
+rotuladas, nenhuma delas errada, e o pool da moda estava vazio para elas; o
+gate de 100% (`fd.validar_fd`) comparou sujo com limpo nas células rotuladas
+e, sem nenhuma célula errada para errar, aprovou por vacuidade — não porque a
+FD tenha sido testada contra um erro e acertado. A FD aprovada assim foi para
+o produto (`DEPENDENCIAS` e `FDS`) do mesmo jeito que uma FD testada de
+verdade. No `environment`, essa FD acaba anulada pela intra super-marcada
+(parágrafo acima), então não chega a corrigir nada errado por conta própria
+— mas numa tabela em que a intra não marcasse tudo, uma FD nunca validada
+contra um erro entraria em ação no limpador só porque nenhuma célula rotulada
+discordava. É por isso que a frase da seção "Duas vias de detecção" do
+`CLAUDE.md` — "uma FD que erra qualquer célula rotulada nunca chega a marcar
+nada" — é verdadeira ao pé da letra mas não é a garantia que parece: o gate
+de 100% filtra FD que erra o rotulado, não garante que o rotulado tenha
+testado a FD. **Gate aprovado por vacuidade** é lacuna conhecida, não
+resolvida aqui.
 
 **Onde:** `limpeza/empacotar.py::_ESTATICO` (`_mascara`, `_desvios_da_moda`,
 `_aplicar_fd` recebendo a máscara combinada) e
